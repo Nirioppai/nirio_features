@@ -22,3 +22,16 @@
 - `firebase` set as peer dependency; externalized from bundle in tsup
 - 9 unit tests in `src/adapters/firebase.test.ts` — all passing via vitest with mocked Firestore
 - Public API exported from `src/index.ts`
+
+## 2026-04-10 — Phase 3: Core Widget Shell
+
+**Status:** Complete
+
+- Implemented `<feature-suggestions>` custom element in `src/widget.ts` with shadow DOM
+- `user` prop accepts `{ id, name, email, role }` as JS property or JSON attribute string
+- `theme` prop applies `--fs-primary-color`, `--fs-background`, `--fs-font` CSS custom properties to host element
+- `logo` prop renders `<img>` above the tagline "Let us know how we can improve..."
+- `defineWidget()` factory guards against double-registration via `customElements.get`
+- `adapter` property wired for use in Phase 4+
+- 9 widget tests in `src/widget.test.ts` — all passing via vitest + happy-dom
+- `WidgetUser` and `WidgetTheme` types exported from public API
