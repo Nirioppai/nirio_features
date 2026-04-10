@@ -380,4 +380,63 @@ describe('Detail dialog, voting, and comments', () => {
     expect(el.shadowRoot!.innerHTML).toContain('Nice idea');
     expect(el.shadowRoot!.innerHTML).toContain('💬 1');
   });
+
+  it('shows status selector for admin and persists status via adapter', async () => {
+    // make this element admin
+    (el as unknown as { user: WidgetUser }).user = { id: 'u2', name: 'Bob', email: 'bob@example.com', role: 'admin' };
+    const suggestion = {
+      id: 's5',
+      title: 'Release notes',
+      type: 'Bug Report' as const,
+      authorId: 'u1',
+      authorName: 'Alice',
+      createdAt: new Date(),
+      voteCount: 0,
+      commentCount: 0,
+    };
+    const setStatus = vi.fn().mockResolvedValue(undefined);
+    const adapter = makeMockAdapter({ getSuggestions: vi.fn().mockResolvedValue([suggestion]), getComments: vi.fn().mockResolvedValue([]), getVote: vi.fn().mockResolvedValue(null), setStatus });
+    (el as unknown as { adapter: StorageAdapter }).adapter = adapter;
+    await new Promise(r => setTimeout(r, 0));
+
+    const card = el.shadowRoot!.querySelector('.fs-card') as HTMLElement;
+    card.click();
+    await new Promise(r => setTimeout(r, 0));
+
+    const select = el.shadowRoot!.querySelector<HTMLSelectElement>('#fs-status-select');
+    expect(select).not.toBeNull();
+    // change status
+    select!.value = 'Planned';
+    select!.dispatchEvent(new Event('change'));
+    await new Promise(r => setTimeout(r, 0));
+
+    expect(setStatus).toHaveBeenCalledWith('s5', 'Planned');
+    // status badge should appear on feed and dialog
+    expect(el.shadowRoot!.innerHTML).toContain('Planned');
+  });
+
+  it('does not show status selector for non-admin users', async () => {
+    // ensure role is user
+    (el as unknown as { user: WidgetUser }).user = { id: 'u2', name: 'Bob', email: 'bob@example.com', role: 'user' };
+    const suggestion = {
+      id: 's6',
+      title: 'Typography fixes',
+      type: 'Feature Update' as const,
+      authorId: 'u1',
+      authorName: 'Alice',
+      createdAt: new Date(),
+      voteCount: 0,
+      commentCount: 0,
+    };
+    const adapter = makeMockAdapter({ getSuggestions: vi.fn().mockResolvedValue([suggestion]), getComments: vi.fn().mockResolvedValue([]), getVote: vi.fn().mockResolvedValue(null) });
+    (el as unknown as { adapter: StorageAdapter }).adapter = adapter;
+    await new Promise(r => setTimeout(r, 0));
+
+    const card = el.shadowRoot!.querySelector('.fs-card') as HTMLElement;
+    card.click();
+    await new Promise(r => setTimeout(r, 0));
+
+    const select = el.shadowRoot!.querySelector<HTMLSelectElement>('#fs-status-select');
+    expect(select).toBeNull();
+  });
 });
