@@ -62,3 +62,13 @@
 - `renderFormSection()` / `bindFormEvents()` / `bindShellEvents()` follow the same render-then-bind pattern as the feed
 - On valid submit: calls `adapter.createSuggestion()`, prepends the new suggestion to `_suggestions`, hides form, re-renders feed — no reload needed
 - 15 submission unit tests + 7 new widget tests — 61/61 passing
+
+## 2026-04-10 — Phase 6: Detail Dialog, Voting, Comments
+
+**Status:** Complete
+
+- Added a detail dialog that opens from suggestion cards and displays full title, details, type, status, and meta.
+- Implemented voting with one-vote-per-user semantics (adapter: `getVote`, `addVote`, `removeVote`); toggling updates counts locally and persists via the adapter.
+- Implemented comment thread (adapter: `getComments`, `addComment`) with optimistic UI update and commentCount increment.
+- Added keyboard accessibility for opening suggestions (Enter / Space) and a close control for the dialog.
+- Added unit tests for dialog open/close, vote toggling, and comment submission; all tests pass.

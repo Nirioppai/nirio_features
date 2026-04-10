@@ -1,9 +1,22 @@
 import type { StorageAdapter } from './adapter';
-import type { Suggestion, SuggestionType } from './types';
+import type { Suggestion, SuggestionType, Comment } from './types';
 import { renderFeedHTML, type SortOption } from './feed';
-import { renderSubmissionFormHTML, validateTitle, type SubmissionFormState } from './submission';
+import {
+  renderSubmissionFormHTML,
+  validateTitle,
+  type SubmissionFormState,
+} from './submission';
 
 export type { SortOption };
+
+function escapeHtml(str: string): string {
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
 
 export interface WidgetUser {
   id: string;
@@ -28,7 +41,15 @@ class FeatureSuggestionsElement extends HTMLElement {
   private _sort: SortOption = 'newest';
   private _searchQuery = '';
   private _showForm = false;
-  private _formState: SubmissionFormState = { title: '', details: '', type: 'New Feature', error: null };
+  private _formState: SubmissionFormState = {
+    title: '',
+    details: '',
+    type: 'New Feature',
+    error: null,
+  };
+  private _activeSuggestionId: string | null = null;
+  private _comments: Comment[] = [];
+  private _userVoted = false;
   private _root: ShadowRoot;
 
   constructor() {
@@ -78,7 +99,11 @@ class FeatureSuggestionsElement extends HTMLElement {
     return this._adapter;
   }
 
-  attributeChangedCallback(name: string, _old: string | null, newVal: string | null): void {
+  attributeChangedCallback(
+    name: string,
+    _old: string | null,
+    newVal: string | null,
+  ): void {
     if (name === 'user') {
       try {
         this._user = newVal ? (JSON.parse(newVal) as WidgetUser) : null;
@@ -221,6 +246,7 @@ class FeatureSuggestionsElement extends HTMLElement {
         </div>
         <div id="fs-form-root"></div>
         <div id="fs-feed-root"></div>
+        <div id="fs-dialog-root"></div>
       </div>
     `;
     this.renderFeed();
@@ -240,6 +266,137 @@ class FeatureSuggestionsElement extends HTMLElement {
     this.bindFeedEvents();
   }
 
+  private renderDetailDialog(): void {
+    const container = this._root.getElementById('fs-dialog-root');
+    if (!container) return;
+    if (!this._activeSuggestionId) {
+      container.innerHTML = '';
+      return;
+    }
+
+    const s = this._suggestions.find(x => x.id === this._activeSuggestionId);
+    if (!s) {
+      container.innerHTML = '';
+      return;
+    }
+
+    const commentsHtml = this._comments
+      .map(
+        c =>
+          `<div class="fs-comment"><div class="fs-comment-meta"><strong>${escapeHtml(c.authorName)}</strong> · <span class="fs-comment-time">${escapeHtml(
+            c.createdAt.toISOString(),
+          )}</span></div><div class="fs-comment-body">${escapeHtml(c.body)}</div></div>`,
+      )
+      .join('');
+
+    container.innerHTML = `
+      <div class="fs-dialog" role="dialog" aria-modal="true">
+        <div class="fs-dialog-content">
+          <button id="fs-dialog-close" class="fs-btn fs-btn--cancel">Close</button>
+          <h2 class="fs-card-title">${escapeHtml(s.title)}</h2>
+          <div class="fs-card-header">
+            <span class="fs-card-type">${escapeHtml(s.type)}</span>
+            ${s.status ? `<span class="fs-card-status">${escapeHtml(s.status)}</span>` : ''}
+          </div>
+          ${s.details ? `<p class="fs-card-details">${escapeHtml(s.details)}</p>` : ''}
+          <div class="fs-card-meta">
+            <button id="fs-upvote-btn" class="fs-btn fs-btn--primary">▲ ${s.voteCount}${this._userVoted ? ' (voted)' : ''}</button>
+            <span class="fs-card-comments">💬 ${s.commentCount}</span>
+            <span class="fs-card-author">by ${escapeHtml(s.authorName)}</span>
+          </div>
+
+          <div class="fs-comments-root">
+            <h3>Comments</h3>
+            <div class="fs-comments-list">${commentsHtml || '<div class="fs-state">No comments yet.</div>'}</div>
+            <form id="fs-comment-form" class="fs-comment-form">
+              <textarea id="fs-comment-body" class="fs-form-input fs-form-textarea" placeholder="Add a comment"></textarea>
+              <div class="fs-form-actions"><button type="submit" class="fs-btn fs-btn--primary">Comment</button></div>
+            </form>
+          </div>
+        </div>
+      </div>
+    `;
+
+    this.bindDetailEvents();
+  }
+
+  private async openDetail(suggestionId: string): Promise<void> {
+    if (!this._adapter) return;
+    this._activeSuggestionId = suggestionId;
+    // fetch comments and vote state
+    try {
+      this._comments = await this._adapter.getComments(suggestionId);
+      if (this._user) {
+        const vote = await this._adapter.getVote(suggestionId, this._user.id);
+        this._userVoted = !!vote;
+      } else {
+        this._userVoted = false;
+      }
+    } catch {
+      this._comments = [];
+      this._userVoted = false;
+    }
+    this.renderDetailDialog();
+  }
+
+  private closeDetail(): void {
+    this._activeSuggestionId = null;
+    this._comments = [];
+    this._userVoted = false;
+    this.renderDetailDialog();
+  }
+
+  private bindDetailEvents(): void {
+    const dialogRoot = this._root.getElementById('fs-dialog-root');
+    if (!dialogRoot) return;
+    dialogRoot
+      .querySelector('#fs-dialog-close')
+      ?.addEventListener('click', () => this.closeDetail());
+
+    const upvoteBtn =
+      dialogRoot.querySelector<HTMLButtonElement>('#fs-upvote-btn');
+    upvoteBtn?.addEventListener('click', async () => {
+      if (!this._adapter || !this._user || !this._activeSuggestionId) return;
+      const id = this._activeSuggestionId;
+      const suggestion = this._suggestions.find(s => s.id === id);
+      if (!suggestion) return;
+      if (this._userVoted) {
+        await this._adapter.removeVote(id, this._user.id);
+        suggestion.voteCount = Math.max(0, suggestion.voteCount - 1);
+        this._userVoted = false;
+      } else {
+        await this._adapter.addVote(id, this._user.id);
+        suggestion.voteCount = suggestion.voteCount + 1;
+        this._userVoted = true;
+      }
+      this.renderFeed();
+      this.renderDetailDialog();
+    });
+
+    const commentForm =
+      dialogRoot.querySelector<HTMLFormElement>('#fs-comment-form');
+    commentForm?.addEventListener('submit', async e => {
+      e.preventDefault();
+      if (!this._adapter || !this._user || !this._activeSuggestionId) return;
+      const textarea =
+        commentForm.querySelector<HTMLTextAreaElement>('#fs-comment-body');
+      const body = textarea?.value?.trim() ?? '';
+      if (!body) return;
+      const added = await this._adapter.addComment(this._activeSuggestionId!, {
+        authorId: this._user.id,
+        authorName: this._user.name,
+        body,
+      });
+      this._comments.push(added);
+      const suggestion = this._suggestions.find(
+        s => s.id === this._activeSuggestionId,
+      );
+      if (suggestion) suggestion.commentCount = suggestion.commentCount + 1;
+      this.renderFeed();
+      this.renderDetailDialog();
+    });
+  }
+
   private renderFormSection(): void {
     const container = this._root.getElementById('fs-form-root');
     if (!container) return;
@@ -254,7 +411,12 @@ class FeatureSuggestionsElement extends HTMLElement {
   private bindShellEvents(): void {
     this._root.getElementById('fs-new-btn')?.addEventListener('click', () => {
       this._showForm = true;
-      this._formState = { title: '', details: '', type: 'New Feature', error: null };
+      this._formState = {
+        title: '',
+        details: '',
+        type: 'New Feature',
+        error: null,
+      };
       this.renderFormSection();
     });
   }
@@ -273,10 +435,27 @@ class FeatureSuggestionsElement extends HTMLElement {
       }
     });
 
-    this._root.querySelectorAll<HTMLButtonElement>('.fs-sort-btn').forEach(btn => {
-      btn.addEventListener('click', () => {
-        this._sort = btn.dataset['sort'] as SortOption;
-        this.renderFeed();
+    this._root
+      .querySelectorAll<HTMLButtonElement>('.fs-sort-btn')
+      .forEach(btn => {
+        btn.addEventListener('click', () => {
+          this._sort = btn.dataset['sort'] as SortOption;
+          this.renderFeed();
+        });
+      });
+
+    // open detail on card click / keyboard
+    this._root.querySelectorAll<HTMLElement>('.fs-card').forEach(card => {
+      card.addEventListener('click', () => {
+        const id = card.dataset['id'];
+        if (id) void this.openDetail(id);
+      });
+      card.addEventListener('keydown', e => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          const id = card.dataset['id'];
+          if (id) void this.openDetail(id);
+        }
       });
     });
   }
@@ -288,7 +467,8 @@ class FeatureSuggestionsElement extends HTMLElement {
     form.addEventListener('submit', e => {
       e.preventDefault();
       const titleInput = form.querySelector<HTMLInputElement>('#fs-title');
-      const detailsInput = form.querySelector<HTMLTextAreaElement>('#fs-details');
+      const detailsInput =
+        form.querySelector<HTMLTextAreaElement>('#fs-details');
       const typeSelect = form.querySelector<HTMLSelectElement>('#fs-type');
 
       const title = titleInput?.value ?? '';
@@ -308,7 +488,12 @@ class FeatureSuggestionsElement extends HTMLElement {
 
     form.querySelector('.fs-btn--cancel')?.addEventListener('click', () => {
       this._showForm = false;
-      this._formState = { title: '', details: '', type: 'New Feature', error: null };
+      this._formState = {
+        title: '',
+        details: '',
+        type: 'New Feature',
+        error: null,
+      };
       this.renderFormSection();
     });
   }
@@ -328,7 +513,12 @@ class FeatureSuggestionsElement extends HTMLElement {
     });
     this._suggestions = [suggestion, ...this._suggestions];
     this._showForm = false;
-    this._formState = { title: '', details: '', type: 'New Feature', error: null };
+    this._formState = {
+      title: '',
+      details: '',
+      type: 'New Feature',
+      error: null,
+    };
     this.renderFeed();
     this.renderFormSection();
   }
