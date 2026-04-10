@@ -1,6 +1,7 @@
 import type { StorageAdapter } from './adapter';
-import type { Suggestion } from './types';
+import type { Suggestion, SuggestionType } from './types';
 import { renderFeedHTML, type SortOption } from './feed';
+import { renderSubmissionFormHTML, validateTitle, type SubmissionFormState } from './submission';
 
 export type { SortOption };
 
@@ -26,6 +27,8 @@ class FeatureSuggestionsElement extends HTMLElement {
   private _loading = false;
   private _sort: SortOption = 'newest';
   private _searchQuery = '';
+  private _showForm = false;
+  private _formState: SubmissionFormState = { title: '', details: '', type: 'New Feature', error: null };
   private _root: ShadowRoot;
 
   constructor() {
@@ -179,16 +182,50 @@ class FeatureSuggestionsElement extends HTMLElement {
         .fs-card-details { margin: 0 0 8px; font-size: 0.875rem; color: #6b7280; }
         .fs-card-meta { display: flex; gap: 12px; font-size: 0.8rem; color: #9ca3af; }
         .fs-state { padding: 32px; text-align: center; color: #9ca3af; }
+        .fs-btn {
+          padding: 8px 16px; border: none; border-radius: 6px;
+          font-size: 0.875rem; cursor: pointer; font-family: inherit;
+        }
+        .fs-btn--primary { background: var(--fs-primary-color, #6366f1); color: #fff; }
+        .fs-btn--primary:hover { opacity: 0.9; }
+        .fs-btn--cancel {
+          background: transparent; border: 1px solid #d1d5db; color: #374151;
+        }
+        .fs-form {
+          background: #fff; border: 1px solid #e5e7eb; border-radius: 8px;
+          padding: 20px; margin-bottom: 24px;
+        }
+        .fs-form-title { margin: 0 0 16px; font-size: 1rem; font-weight: 600; }
+        .fs-form-error {
+          color: #dc2626; background: #fef2f2; border: 1px solid #fecaca;
+          border-radius: 6px; padding: 8px 12px; margin-bottom: 12px;
+          font-size: 0.875rem;
+        }
+        .fs-form-field { display: flex; flex-direction: column; gap: 4px; margin-bottom: 12px; }
+        .fs-form-label { font-size: 0.875rem; font-weight: 500; color: #374151; }
+        .fs-form-input {
+          padding: 8px 12px; border: 1px solid #d1d5db; border-radius: 6px;
+          font-size: 0.875rem; font-family: inherit; outline: none;
+        }
+        .fs-form-input:focus { border-color: var(--fs-primary-color, #6366f1); }
+        .fs-form-input--error { border-color: #dc2626; }
+        .fs-form-textarea { resize: vertical; min-height: 80px; }
+        .fs-form-select { background: #fff; cursor: pointer; }
+        .fs-form-actions { display: flex; gap: 8px; margin-top: 16px; }
       </style>
       <div class="fs-shell">
         <div class="fs-header">
           ${this._logo ? `<img class="fs-logo" src="${this._logo}" alt="Logo" />` : ''}
           <p class="fs-tagline">Let us know how we can improve...</p>
+          <button id="fs-new-btn" class="fs-btn fs-btn--primary">+ New Suggestion</button>
         </div>
+        <div id="fs-form-root"></div>
         <div id="fs-feed-root"></div>
       </div>
     `;
     this.renderFeed();
+    this.renderFormSection();
+    this.bindShellEvents();
   }
 
   private renderFeed(): void {
@@ -201,6 +238,25 @@ class FeatureSuggestionsElement extends HTMLElement {
       this._searchQuery,
     );
     this.bindFeedEvents();
+  }
+
+  private renderFormSection(): void {
+    const container = this._root.getElementById('fs-form-root');
+    if (!container) return;
+    if (!this._showForm) {
+      container.innerHTML = '';
+      return;
+    }
+    container.innerHTML = renderSubmissionFormHTML(this._formState);
+    this.bindFormEvents();
+  }
+
+  private bindShellEvents(): void {
+    this._root.getElementById('fs-new-btn')?.addEventListener('click', () => {
+      this._showForm = true;
+      this._formState = { title: '', details: '', type: 'New Feature', error: null };
+      this.renderFormSection();
+    });
   }
 
   private bindFeedEvents(): void {
@@ -223,6 +279,58 @@ class FeatureSuggestionsElement extends HTMLElement {
         this.renderFeed();
       });
     });
+  }
+
+  private bindFormEvents(): void {
+    const form = this._root.querySelector<HTMLFormElement>('.fs-form');
+    if (!form) return;
+
+    form.addEventListener('submit', e => {
+      e.preventDefault();
+      const titleInput = form.querySelector<HTMLInputElement>('#fs-title');
+      const detailsInput = form.querySelector<HTMLTextAreaElement>('#fs-details');
+      const typeSelect = form.querySelector<HTMLSelectElement>('#fs-type');
+
+      const title = titleInput?.value ?? '';
+      const details = detailsInput?.value ?? '';
+      const type = (typeSelect?.value ?? 'New Feature') as SuggestionType;
+
+      const error = validateTitle(title);
+      if (error) {
+        this._formState = { title, details, type, error };
+        this.renderFormSection();
+        return;
+      }
+
+      if (!this._adapter || !this._user) return;
+      void this.submitSuggestion({ title, details, type });
+    });
+
+    form.querySelector('.fs-btn--cancel')?.addEventListener('click', () => {
+      this._showForm = false;
+      this._formState = { title: '', details: '', type: 'New Feature', error: null };
+      this.renderFormSection();
+    });
+  }
+
+  private async submitSuggestion(values: {
+    title: string;
+    details: string;
+    type: SuggestionType;
+  }): Promise<void> {
+    if (!this._adapter || !this._user) return;
+    const suggestion = await this._adapter.createSuggestion({
+      title: values.title,
+      details: values.details || undefined,
+      type: values.type,
+      authorId: this._user.id,
+      authorName: this._user.name,
+    });
+    this._suggestions = [suggestion, ...this._suggestions];
+    this._showForm = false;
+    this._formState = { title: '', details: '', type: 'New Feature', error: null };
+    this.renderFeed();
+    this.renderFormSection();
   }
 }
 

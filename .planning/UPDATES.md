@@ -49,3 +49,16 @@
 - Feed renders inside `#fs-feed-root` container (separate from shell) to avoid full re-renders on sort/search
 - Sort buttons and search input bind events after each feed render; search restores cursor position
 - 21 feed unit tests + 9 widget + 9 firebase — 39/39 passing
+
+## 2026-04-10 — Phase 5: Suggestion Submission
+
+**Status:** Complete
+
+- Created `src/submission.ts` with `renderSubmissionFormHTML` and `validateTitle` pure functions
+- Form renders title input (required), details textarea (optional), and type selector (New Feature / Feature Update / Bug Report)
+- Validation: empty or whitespace-only title returns error and blocks adapter call
+- Error state renders `role="alert"` message and `aria-invalid` on title input; all user content HTML-escaped
+- Widget updated with `_showForm` / `_formState` fields and a "+ New Suggestion" button in the header
+- `renderFormSection()` / `bindFormEvents()` / `bindShellEvents()` follow the same render-then-bind pattern as the feed
+- On valid submit: calls `adapter.createSuggestion()`, prepends the new suggestion to `_suggestions`, hides form, re-renders feed — no reload needed
+- 15 submission unit tests + 7 new widget tests — 61/61 passing
