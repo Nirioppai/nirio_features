@@ -383,7 +383,12 @@ describe('Detail dialog, voting, and comments', () => {
 
   it('shows status selector for admin and persists status via adapter', async () => {
     // make this element admin
-    (el as unknown as { user: WidgetUser }).user = { id: 'u2', name: 'Bob', email: 'bob@example.com', role: 'admin' };
+    (el as unknown as { user: WidgetUser }).user = {
+      id: 'u2',
+      name: 'Bob',
+      email: 'bob@example.com',
+      role: 'admin',
+    };
     const suggestion = {
       id: 's5',
       title: 'Release notes',
@@ -395,7 +400,12 @@ describe('Detail dialog, voting, and comments', () => {
       commentCount: 0,
     };
     const setStatus = vi.fn().mockResolvedValue(undefined);
-    const adapter = makeMockAdapter({ getSuggestions: vi.fn().mockResolvedValue([suggestion]), getComments: vi.fn().mockResolvedValue([]), getVote: vi.fn().mockResolvedValue(null), setStatus });
+    const adapter = makeMockAdapter({
+      getSuggestions: vi.fn().mockResolvedValue([suggestion]),
+      getComments: vi.fn().mockResolvedValue([]),
+      getVote: vi.fn().mockResolvedValue(null),
+      setStatus,
+    });
     (el as unknown as { adapter: StorageAdapter }).adapter = adapter;
     await new Promise(r => setTimeout(r, 0));
 
@@ -403,7 +413,8 @@ describe('Detail dialog, voting, and comments', () => {
     card.click();
     await new Promise(r => setTimeout(r, 0));
 
-    const select = el.shadowRoot!.querySelector<HTMLSelectElement>('#fs-status-select');
+    const select =
+      el.shadowRoot!.querySelector<HTMLSelectElement>('#fs-status-select');
     expect(select).not.toBeNull();
     // change status
     select!.value = 'Planned';
@@ -417,7 +428,12 @@ describe('Detail dialog, voting, and comments', () => {
 
   it('does not show status selector for non-admin users', async () => {
     // ensure role is user
-    (el as unknown as { user: WidgetUser }).user = { id: 'u2', name: 'Bob', email: 'bob@example.com', role: 'user' };
+    (el as unknown as { user: WidgetUser }).user = {
+      id: 'u2',
+      name: 'Bob',
+      email: 'bob@example.com',
+      role: 'user',
+    };
     const suggestion = {
       id: 's6',
       title: 'Typography fixes',
@@ -428,7 +444,11 @@ describe('Detail dialog, voting, and comments', () => {
       voteCount: 0,
       commentCount: 0,
     };
-    const adapter = makeMockAdapter({ getSuggestions: vi.fn().mockResolvedValue([suggestion]), getComments: vi.fn().mockResolvedValue([]), getVote: vi.fn().mockResolvedValue(null) });
+    const adapter = makeMockAdapter({
+      getSuggestions: vi.fn().mockResolvedValue([suggestion]),
+      getComments: vi.fn().mockResolvedValue([]),
+      getVote: vi.fn().mockResolvedValue(null),
+    });
     (el as unknown as { adapter: StorageAdapter }).adapter = adapter;
     await new Promise(r => setTimeout(r, 0));
 
@@ -436,7 +456,8 @@ describe('Detail dialog, voting, and comments', () => {
     card.click();
     await new Promise(r => setTimeout(r, 0));
 
-    const select = el.shadowRoot!.querySelector<HTMLSelectElement>('#fs-status-select');
+    const select =
+      el.shadowRoot!.querySelector<HTMLSelectElement>('#fs-status-select');
     expect(select).toBeNull();
   });
 });

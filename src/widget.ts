@@ -298,7 +298,9 @@ class FeatureSuggestionsElement extends HTMLElement {
             <span class="fs-card-type">${escapeHtml(s.type)}</span>
             ${s.status ? `<span class="fs-card-status">${escapeHtml(s.status)}</span>` : ''}
           </div>
-          ${this._user?.role === 'admin' ? `
+          ${
+            this._user?.role === 'admin'
+              ? `
             <div class="fs-admin-status">
               <label for="fs-status-select">Status:</label>
               <select id="fs-status-select" class="fs-form-select">
@@ -310,7 +312,9 @@ class FeatureSuggestionsElement extends HTMLElement {
                 <option value="Declined" ${s.status === 'Declined' ? 'selected' : ''}>Declined</option>
               </select>
             </div>
-          ` : ''}
+          `
+              : ''
+          }
           ${s.details ? `<p class="fs-card-details">${escapeHtml(s.details)}</p>` : ''}
           <div class="fs-card-meta">
             <button id="fs-upvote-btn" class="fs-btn fs-btn--primary">▲ ${s.voteCount}${this._userVoted ? ' (voted)' : ''}</button>
@@ -410,14 +414,17 @@ class FeatureSuggestionsElement extends HTMLElement {
     });
 
     // admin status control - visible only when admin rendered the select
-    const statusSelect = dialogRoot.querySelector<HTMLSelectElement>('#fs-status-select');
+    const statusSelect =
+      dialogRoot.querySelector<HTMLSelectElement>('#fs-status-select');
     statusSelect?.addEventListener('change', async e => {
       if (!this._adapter || !this._activeSuggestionId) return;
       const val = (e.target as HTMLSelectElement).value;
       if (!val) return;
       try {
         await this._adapter.setStatus(this._activeSuggestionId, val as any);
-        const suggestion = this._suggestions.find(s => s.id === this._activeSuggestionId);
+        const suggestion = this._suggestions.find(
+          s => s.id === this._activeSuggestionId,
+        );
         if (suggestion) suggestion.status = val as any;
         this.renderFeed();
         this.renderDetailDialog();
