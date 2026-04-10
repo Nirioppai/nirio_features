@@ -1,4 +1,13 @@
 // Feature Suggestion Widget — entry point
-// Implementation begins in Phase 3 (Core Widget Shell)
 
-export {};
+export type { StorageAdapter } from './adapter';
+export { createFirebaseAdapter } from './adapters/firebase';
+export type {
+  Suggestion,
+  Comment,
+  Vote,
+  CreateSuggestionInput,
+  CreateCommentInput,
+  SuggestionType,
+  SuggestionStatus,
+} from './types';
