@@ -12,4 +12,4 @@ export type {
   SuggestionStatus,
 } from './types';
 export { defineWidget } from './widget';
-export type { WidgetUser, WidgetTheme } from './widget';
+export type { WidgetUser, WidgetTheme, SortOption } from './widget';

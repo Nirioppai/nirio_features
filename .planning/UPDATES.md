@@ -35,3 +35,17 @@
 - `adapter` property wired for use in Phase 4+
 - 9 widget tests in `src/widget.test.ts` — all passing via vitest + happy-dom
 - `WidgetUser` and `WidgetTheme` types exported from public API
+
+## 2026-04-10 — Phase 4: Suggestion Feed
+
+**Status:** Complete
+
+- Created `src/feed.ts` with pure functions: `sortSuggestions`, `filterSuggestions`, `renderSuggestionCard`, `renderFeedHTML`
+- Sort options: Newest (createdAt desc), Most Voted (voteCount desc), Trending (commentCount desc)
+- Search filters across title and details, case-insensitive, trims whitespace
+- Loading state and empty state render without errors
+- HTML output escapes user content to prevent XSS
+- Widget updated to fetch suggestions on `connectedCallback` and when `adapter` is set post-connect
+- Feed renders inside `#fs-feed-root` container (separate from shell) to avoid full re-renders on sort/search
+- Sort buttons and search input bind events after each feed render; search restores cursor position
+- 21 feed unit tests + 9 widget + 9 firebase — 39/39 passing
