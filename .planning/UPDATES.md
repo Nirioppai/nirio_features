@@ -72,3 +72,13 @@
 - Implemented comment thread (adapter: `getComments`, `addComment`) with optimistic UI update and commentCount increment.
 - Added keyboard accessibility for opening suggestions (Enter / Space) and a close control for the dialog.
 - Added unit tests for dialog open/close, vote toggling, and comment submission; all tests pass.
+
+## 2026-04-10 — Phase 7: Admin Controls
+
+**Status:** Complete
+
+- Added admin-only status selector in the suggestion detail dialog visible when the host passes a `user` with `role: 'admin'`.
+- Hooked `setStatus(suggestionId, status)` on the `StorageAdapter` to persist status changes and update local UI state.
+- Status badge renders on suggestion cards and the detail dialog for all users (admins set, everyone sees).
+- Added unit tests covering admin selector visibility and persistence.
+
