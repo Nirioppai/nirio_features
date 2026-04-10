@@ -82,3 +82,11 @@
 - Status badge renders on suggestion cards and the detail dialog for all users (admins set, everyone sees).
 - Added unit tests covering admin selector visibility and persistence.
 
+## 2026-04-10 — Phase 8: Package Release & Integration Test
+
+**Status:** In progress
+
+- Bumped package version to `1.0.0` and produced ESM/CJS bundles with typings via `tsup`.
+- Added a minimal consumer integration test that imports the built ESM bundle and verifies the custom element registers and mounts in a DOM environment.
+- Created an npm tarball (`npm pack`) to verify packaging output.
+- Next: create a release tag (`v1.0.0`) and push to the remote, and optionally publish to GitHub Packages.
