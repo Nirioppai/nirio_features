@@ -53,7 +53,9 @@ describe('statusToClassName', () => {
   });
 
   it('unknown input via cast falls back to empty string — no class injection', () => {
-    const unknown = statusToClassName('<script>alert(1)</script>' as SuggestionStatus);
+    const unknown = statusToClassName(
+      '<script>alert(1)</script>' as SuggestionStatus,
+    );
     expect(unknown).toBe('');
   });
 });

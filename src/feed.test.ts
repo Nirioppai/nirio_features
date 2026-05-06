@@ -22,9 +22,27 @@ function makeSuggestion(overrides: Partial<Suggestion> = {}): Suggestion {
 }
 
 const suggestions: Suggestion[] = [
-  makeSuggestion({ id: 'a', title: 'Alpha', voteCount: 5, commentCount: 1, createdAt: new Date('2024-01-03') }),
-  makeSuggestion({ id: 'b', title: 'Beta',  voteCount: 2, commentCount: 8, createdAt: new Date('2024-01-01') }),
-  makeSuggestion({ id: 'c', title: 'Gamma', voteCount: 9, commentCount: 3, createdAt: new Date('2024-01-02') }),
+  makeSuggestion({
+    id: 'a',
+    title: 'Alpha',
+    voteCount: 5,
+    commentCount: 1,
+    createdAt: new Date('2024-01-03'),
+  }),
+  makeSuggestion({
+    id: 'b',
+    title: 'Beta',
+    voteCount: 2,
+    commentCount: 8,
+    createdAt: new Date('2024-01-01'),
+  }),
+  makeSuggestion({
+    id: 'c',
+    title: 'Gamma',
+    voteCount: 9,
+    commentCount: 3,
+    createdAt: new Date('2024-01-02'),
+  }),
 ];
 
 describe('sortSuggestions', () => {
@@ -67,7 +85,11 @@ describe('filterSuggestions', () => {
 
   it('filters by details', () => {
     const withDetails = [
-      makeSuggestion({ id: 'x', title: 'Thing', details: 'Export to CSV would help' }),
+      makeSuggestion({
+        id: 'x',
+        title: 'Thing',
+        details: 'Export to CSV would help',
+      }),
       makeSuggestion({ id: 'y', title: 'Other', details: 'No match here' }),
     ];
     const result = filterSuggestions(withDetails, 'csv');
@@ -122,13 +144,17 @@ describe('renderFeedHTML', () => {
 
 describe('renderSuggestionCard', () => {
   it('renders title and author', () => {
-    const html = renderSuggestionCard(makeSuggestion({ title: 'My idea', authorName: 'Bob' }));
+    const html = renderSuggestionCard(
+      makeSuggestion({ title: 'My idea', authorName: 'Bob' }),
+    );
     expect(html).toContain('My idea');
     expect(html).toContain('Bob');
   });
 
   it('renders vote and comment counts', () => {
-    const html = renderSuggestionCard(makeSuggestion({ voteCount: 7, commentCount: 3 }));
+    const html = renderSuggestionCard(
+      makeSuggestion({ voteCount: 7, commentCount: 3 }),
+    );
     expect(html).toContain('▲ 7');
     expect(html).toContain('💬 3');
   });
@@ -145,7 +171,9 @@ describe('renderSuggestionCard', () => {
   });
 
   it('renders semantic modifier class for multi-word status In Progress', () => {
-    const html = renderSuggestionCard(makeSuggestion({ status: 'In Progress' }));
+    const html = renderSuggestionCard(
+      makeSuggestion({ status: 'In Progress' }),
+    );
     expect(html).toContain('fs-card-status--in-progress');
     expect(html).toContain('In Progress');
   });
@@ -166,12 +194,16 @@ describe('renderSuggestionCard', () => {
   });
 
   it('renders details when present', () => {
-    const html = renderSuggestionCard(makeSuggestion({ details: 'More detail here' }));
+    const html = renderSuggestionCard(
+      makeSuggestion({ details: 'More detail here' }),
+    );
     expect(html).toContain('More detail here');
   });
 
   it('escapes HTML in title to prevent XSS', () => {
-    const html = renderSuggestionCard(makeSuggestion({ title: '<script>alert(1)</script>' }));
+    const html = renderSuggestionCard(
+      makeSuggestion({ title: '<script>alert(1)</script>' }),
+    );
     expect(html).not.toContain('<script>');
     expect(html).toContain('&lt;script&gt;');
   });

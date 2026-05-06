@@ -1,5 +1,10 @@
 import type { StorageAdapter } from './adapter';
-import type { Suggestion, SuggestionType, SuggestionStatus, Comment } from './types';
+import type {
+  Suggestion,
+  SuggestionType,
+  SuggestionStatus,
+  Comment,
+} from './types';
 import { renderFeedHTML, type SortOption } from './feed';
 import { STATUS_OPTIONS, statusToClassName } from './status';
 import {

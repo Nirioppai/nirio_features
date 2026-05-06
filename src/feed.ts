@@ -3,7 +3,10 @@ import { statusToClassName } from './status';
 
 export type SortOption = 'trending' | 'most-voted' | 'newest';
 
-export function sortSuggestions(suggestions: Suggestion[], sort: SortOption): Suggestion[] {
+export function sortSuggestions(
+  suggestions: Suggestion[],
+  sort: SortOption,
+): Suggestion[] {
   const copy = [...suggestions];
   switch (sort) {
     case 'trending':
@@ -15,7 +18,10 @@ export function sortSuggestions(suggestions: Suggestion[], sort: SortOption): Su
   }
 }
 
-export function filterSuggestions(suggestions: Suggestion[], query: string): Suggestion[] {
+export function filterSuggestions(
+  suggestions: Suggestion[],
+  query: string,
+): Suggestion[] {
   const q = query.trim().toLowerCase();
   if (!q) return suggestions;
   return suggestions.filter(
@@ -53,7 +59,10 @@ export function renderFeedHTML(
     return '<div class="fs-state fs-loading">Loading suggestions...</div>';
   }
 
-  const visible = filterSuggestions(sortSuggestions(suggestions, sort), searchQuery);
+  const visible = filterSuggestions(
+    sortSuggestions(suggestions, sort),
+    searchQuery,
+  );
 
   const sortButtons: Array<{ value: SortOption; label: string }> = [
     { value: 'newest', label: 'Newest' },

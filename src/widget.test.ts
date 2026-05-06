@@ -493,7 +493,8 @@ describe('Detail dialog, voting, and comments', () => {
     card.click();
     await new Promise(r => setTimeout(r, 0));
 
-    const select = el.shadowRoot!.querySelector<HTMLSelectElement>('#fs-status-select');
+    const select =
+      el.shadowRoot!.querySelector<HTMLSelectElement>('#fs-status-select');
     expect(select).not.toBeNull();
     expect(el.shadowRoot!.innerHTML).toContain('Update Status');
     // Status badge is still visible to all users
@@ -566,7 +567,8 @@ describe('Detail dialog, voting, and comments', () => {
     card.click();
     await new Promise(r => setTimeout(r, 0));
 
-    const select = el.shadowRoot!.querySelector<HTMLSelectElement>('#fs-status-select')!;
+    const select =
+      el.shadowRoot!.querySelector<HTMLSelectElement>('#fs-status-select')!;
     select.value = 'In Progress';
     select.dispatchEvent(new Event('change'));
     await new Promise(r => setTimeout(r, 0));
@@ -608,12 +610,15 @@ describe('Detail dialog, voting, and comments', () => {
     card.click();
     await new Promise(r => setTimeout(r, 0));
 
-    const select = el.shadowRoot!.querySelector<HTMLSelectElement>('#fs-status-select')!;
+    const select =
+      el.shadowRoot!.querySelector<HTMLSelectElement>('#fs-status-select')!;
     select.value = 'In Progress';
     select.dispatchEvent(new Event('change'));
     await new Promise(r => setTimeout(r, 0));
 
-    expect(el.shadowRoot!.innerHTML).toContain("Couldn't save status. Try again.");
+    expect(el.shadowRoot!.innerHTML).toContain(
+      "Couldn't save status. Try again.",
+    );
     // Suggestion status unchanged — badge still shows Planned
     expect(el.shadowRoot!.innerHTML).toContain('Planned');
   });

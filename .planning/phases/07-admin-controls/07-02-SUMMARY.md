@@ -9,6 +9,7 @@
 ## What Was Built
 
 ### `src/widget.ts` (modified)
+
 - Imported `SuggestionStatus` type, `STATUS_OPTIONS`, and `statusToClassName` from the Plan 01 shared helper
 - Added `_statusError: string | null = null` private field; cleared in `closeDetail()` and on successful status save
 - Added Phase 7 CSS rules: semantic status badge color map (`fs-card-status--{slug}` variants), `.fs-admin-status` section layout, `.fs-status-select` input, `.fs-admin-error` inline message
@@ -18,6 +19,7 @@
 - Change handler on status select: disables select while `setStatus()` in flight, updates `suggestion.status` on success and re-renders feed + dialog, on failure rolls back `suggestion.status` to prior value and shows inline error `"Couldn't save status. Try again."`
 
 ### `src/widget.test.ts` (modified)
+
 - Replaced Phase 6 read-only admin assertions (2 tests) with 4 focused Phase 7 tests:
   1. Admin users see `#fs-status-select` and "Update Status" heading; status badge remains visible
   2. Non-admin users do not see selector but do see status badge
@@ -25,6 +27,7 @@
   4. Failed `setStatus()` restores prior suggestion status and shows inline `"Couldn't save status. Try again."` error
 
 ### `package.json` (modified)
+
 - Added `"test:phase7": "npm run build && vitest run src/status.test.ts src/feed.test.ts src/widget.test.ts"` — includes a build step for dist-based smoke confidence
 
 ---
@@ -51,8 +54,8 @@ Total: 58 passed — npm run test:phase7 exits 0
 
 ## Artifacts
 
-| File | Status |
-|------|--------|
-| `src/widget.ts` | Modified |
+| File                 | Status   |
+| -------------------- | -------- |
+| `src/widget.ts`      | Modified |
 | `src/widget.test.ts` | Modified |
-| `package.json` | Modified |
+| `package.json`       | Modified |

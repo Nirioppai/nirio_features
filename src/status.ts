@@ -10,10 +10,10 @@ export const STATUS_OPTIONS: SuggestionStatus[] = [
 
 const STATUS_SLUG_MAP: Record<SuggestionStatus, string> = {
   'Under Review': 'under-review',
-  'Planned': 'planned',
+  Planned: 'planned',
   'In Progress': 'in-progress',
-  'Completed': 'completed',
-  'Declined': 'declined',
+  Completed: 'completed',
+  Declined: 'declined',
 };
 
 /**

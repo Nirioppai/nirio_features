@@ -13,7 +13,7 @@ Build a framework-agnostic Web Components library distributed as a private GitHu
 - [ ] **Phase 5: Suggestion Submission** - Submit form wired to storage adapter
 - [x] **Phase 6: Detail Dialog + Voting + Comments** - Per-suggestion dialog, upvoting, comment thread
 - [x] **Phase 7: Admin Controls** - Status setter (admin-only), status badge (all users)
-- [ ] **Phase 8: Package Release & Integration Test** - Publish v1.0.0, verify in consuming app
+- [x] **Phase 8: Package Release & Integration Test** - Publish v1.0.0, verify in consuming app
 
 ## Phase Details
 
@@ -125,7 +125,11 @@ Build a framework-agnostic Web Components library distributed as a private GitHu
 1. `npm install @org/feature-suggestions` succeeds in the consuming app with a GitHub `.npmrc` token
 2. Widget initializes with a Firebase config and a user prop without console errors
 3. All Phase 1–7 features work end-to-end in the consuming app
-   **Plans**: TBD
+   **Plans**: 2 plans
+   Plans:
+
+- [x] 08-01-PLAN.md - Expand the dist-bundle consumer integration test into a real host-app workflow and add a dedicated Phase 8 release verification command
+- [x] 08-02-PLAN.md - Guard GitHub Packages publishing with Phase 8 verification and document the install and tag-based release contract
 
 ## Progress
 
@@ -138,4 +142,4 @@ Build a framework-agnostic Web Components library distributed as a private GitHu
 | 5. Suggestion Submission              | 0/TBD          | Not started | -          |
 | 6. Detail Dialog + Voting + Comments  | 2/2            | Complete    | 2026-05-06 |
 | 7. Admin Controls                     | 2/2            | Complete    | 2026-05-06 |
-| 8. Package Release & Integration Test | 0/TBD          | Not started | -          |
+| 8. Package Release & Integration Test | 2/2            | Complete    | 2026-05-06 |
