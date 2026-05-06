@@ -739,16 +739,28 @@ class FeatureSuggestionsElement extends HTMLElement {
 
     const closeFormDialog = () => {
       this._dialogMode = 'none';
-      this._formState = { title: '', details: '', type: 'New Feature', error: null };
+      this._formState = {
+        title: '',
+        details: '',
+        type: 'New Feature',
+        error: null,
+      };
       this.renderDialogRoot();
     };
 
-    container.querySelector('#fs-dialog-close')?.addEventListener('click', closeFormDialog);
-    container.querySelector('#fs-dialog-overlay')?.addEventListener('click', event => {
-      if (event.target === event.currentTarget) closeFormDialog();
-    });
+    container
+      .querySelector('#fs-dialog-close')
+      ?.addEventListener('click', closeFormDialog);
+    container
+      .querySelector('#fs-dialog-overlay')
+      ?.addEventListener('click', event => {
+        if (event.target === event.currentTarget) closeFormDialog();
+      });
     container.addEventListener('keydown', event => {
-      if (event.key === 'Escape') { event.preventDefault(); closeFormDialog(); }
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        closeFormDialog();
+      }
     });
 
     this.bindFormEvents();
@@ -1036,7 +1048,12 @@ class FeatureSuggestionsElement extends HTMLElement {
     });
 
     form.querySelector('.fs-btn--cancel')?.addEventListener('click', () => {
-      this._formState = { title: '', details: '', type: 'New Feature', error: null };
+      this._formState = {
+        title: '',
+        details: '',
+        type: 'New Feature',
+        error: null,
+      };
       if (this._dialogMode === 'form') {
         this._dialogMode = 'none';
         this.renderDialogRoot();
@@ -1082,7 +1099,12 @@ class FeatureSuggestionsElement extends HTMLElement {
   closeForm(): void {
     this._showForm = false;
     this._dialogMode = 'none';
-    this._formState = { title: '', details: '', type: 'New Feature', error: null };
+    this._formState = {
+      title: '',
+      details: '',
+      type: 'New Feature',
+      error: null,
+    };
     this.renderFormSection();
     this.renderDialogRoot();
   }
