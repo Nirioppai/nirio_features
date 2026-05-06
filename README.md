@@ -235,7 +235,10 @@ import {
   createHttpAdapter,
 } from '@nirioppai/feature-suggestions';
 
-// 1. Host bootstraps its own session + CSRF (e.g. Laravel Sanctum)
+// 1. Host bootstraps its own session + CSRF (e.g. Laravel Sanctum).
+//    `credentials: 'include'` is REQUIRED on this call — without it the
+//    XSRF-TOKEN cookie will not be set and every later mutating request
+//    from the widget will fail CSRF verification.
 await fetch('https://api.example.com/sanctum/csrf-cookie', {
   credentials: 'include',
 });
