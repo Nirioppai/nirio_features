@@ -14,6 +14,7 @@ gate is green; **the v1.1.0 git tag has not been pushed yet** — see
 ## Code changes
 
 ### 1. `createHttpAdapter` signature aligned with Project A spec — `src/adapters/http.ts`
+
 - Renamed `fetchImpl` → `fetch`. Old `fetchImpl` kept as deprecated alias for
   back-compat; both resolve to the same internal field.
 - Added `credentials?: RequestCredentials` (default `'include'`) so consumers
@@ -21,6 +22,7 @@ gate is green; **the v1.1.0 git tag has not been pushed yet** — see
 - Existing behavior unchanged: `credentials` default is still `'include'`.
 
 ### 2. Custom-element TS surface — `src/widget.ts`, `src/index.ts`
+
 - Re-exported `FeatureSuggestionsElement` class.
 - Added `declare global { interface HTMLElementTagNameMap { ... } }` so
   `document.createElement('feature-suggestions')` returns a typed
@@ -29,10 +31,12 @@ gate is green; **the v1.1.0 git tag has not been pushed yet** — see
   accessors; the class export + map augmentation makes them visible.
 
 ### 3. `firebase` is now an optional peer — `package.json`
+
 - Added `peerDependenciesMeta.firebase.optional = true`. HTTP-adapter-only
   consumers no longer get a missing-peer warning for Firebase.
 
 ### 4. README — `README.md`
+
 - Reformatted the element-properties table; added typed-element example
   using `satisfies WidgetUser`.
 - New "Admin gating" subsection: explicit exact-string `user.role === 'admin'`
@@ -45,6 +49,7 @@ gate is green; **the v1.1.0 git tag has not been pushed yet** — see
 - API list notes that `firebase` is an optional peer.
 
 ### 5. Tests — `src/adapters/http.test.ts`
+
 - Switched primary fixture to `fetch: fetchImpl` (exercises the new option).
 - Added two tests:
   - `still accepts the deprecated 'fetchImpl' alias` (back-compat regression
