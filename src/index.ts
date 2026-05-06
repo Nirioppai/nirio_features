@@ -12,6 +12,7 @@ export type {
   CreateCommentInput,
   SuggestionType,
   SuggestionStatus,
+  WidgetLayout,
 } from './types';
 export { defineWidget, FeatureSuggestionsElement } from './widget';
 export type { WidgetUser, WidgetTheme, SortOption } from './widget';

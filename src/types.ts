@@ -47,3 +47,12 @@ export type CreateCommentInput = {
   authorName: string;
   body: string;
 };
+
+export interface WidgetLayout {
+  bare?: boolean;
+  formMode?: 'inline' | 'modal';
+  filterStyle?: 'dropdown' | 'pill-row';
+  maxFeedWidth?: number;
+  mobileBreakpoint?: number;
+  mobileDialogStyle?: 'center' | 'fullscreen';
+}

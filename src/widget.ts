@@ -4,6 +4,8 @@ import type {
   SuggestionType,
   SuggestionStatus,
   Comment,
+  CreateSuggestionInput,
+  WidgetLayout,
 } from './types';
 import { renderFeedHTML, type SortOption } from './feed';
 import { STATUS_OPTIONS, statusToClassName, typeToClassName } from './status';
@@ -14,6 +16,7 @@ import {
 } from './submission';
 
 export type { SortOption };
+export type { WidgetLayout };
 
 function escapeHtml(str: string): string {
   return str
@@ -61,6 +64,10 @@ class FeatureSuggestionsElement extends HTMLElement {
   private _root: ShadowRoot;
   private _colorSchemeMedia: MediaQueryList | null = null;
   private _colorSchemeListener: (() => void) | null = null;
+  private _layout: WidgetLayout = {};
+  private _filterStatus: SuggestionStatus | null = null;
+  private _filterType: SuggestionType | null = null;
+  private _dialogMode: 'none' | 'detail' | 'form' = 'none';
 
   constructor() {
     super();
@@ -95,6 +102,15 @@ class FeatureSuggestionsElement extends HTMLElement {
 
   set logo(value: string | null) {
     this._logo = value;
+    this.renderShell();
+  }
+
+  get layout(): WidgetLayout {
+    return this._layout;
+  }
+
+  set layout(value: WidgetLayout) {
+    this._layout = value;
     this.renderShell();
   }
 
@@ -307,9 +323,19 @@ class FeatureSuggestionsElement extends HTMLElement {
           --fs-modal-bg: #2a2a3c;
         }
         .fs-shell {
-          max-width: 720px;
+          max-width: ${this._layout.maxFeedWidth ?? 720}px;
           margin: 0 auto;
           padding: var(--fs-space-6);
+        }
+        .fs-shell--bare {
+          padding: 0;
+          margin: 0;
+          max-width: ${this._layout.maxFeedWidth ?? 720}px;
+        }
+        .fs-bare-bar {
+          display: flex;
+          justify-content: flex-end;
+          margin-bottom: var(--fs-space-4);
         }
         .fs-header {
           display: flex;
@@ -503,13 +529,62 @@ class FeatureSuggestionsElement extends HTMLElement {
           flex-direction: column;
           gap: var(--fs-space-2);
         }
+        .fs-filter-pills {
+          display: flex;
+          flex-direction: column;
+          gap: var(--fs-space-2);
+          margin-bottom: var(--fs-space-3);
+        }
+        .fs-pill-group {
+          display: flex;
+          flex-wrap: wrap;
+          gap: var(--fs-space-1);
+          overflow-x: auto;
+          scrollbar-width: none;
+        }
+        .fs-pill-group::-webkit-scrollbar { display: none; }
+        .fs-filter-pill {
+          padding: 4px 12px;
+          border: 1px solid var(--fs-border-strong);
+          border-radius: 999px;
+          background: var(--fs-surface);
+          color: var(--fs-text-muted);
+          font-size: 0.8rem;
+          cursor: pointer;
+          white-space: nowrap;
+          font-family: inherit;
+        }
+        .fs-filter-pill:hover { border-color: var(--fs-border-focus); color: var(--fs-text-color); }
+        .fs-filter-pill--active {
+          background: var(--fs-primary-color);
+          color: #fff;
+          border-color: var(--fs-primary-color);
+        }
+        @media (max-width: ${this._layout.mobileBreakpoint ?? 640}px) {
+          .fs-dialog-overlay {
+            padding: 0;
+            align-items: ${(this._layout.mobileDialogStyle ?? 'fullscreen') === 'center' ? 'center' : 'flex-end'};
+          }
+          .fs-dialog {
+            max-width: 100%;
+            max-height: ${(this._layout.mobileDialogStyle ?? 'fullscreen') === 'center' ? '80vh' : '90vh'};
+            border-bottom-left-radius: ${(this._layout.mobileDialogStyle ?? 'fullscreen') === 'center' ? 'var(--fs-radius-lg)' : '0'};
+            border-bottom-right-radius: ${(this._layout.mobileDialogStyle ?? 'fullscreen') === 'center' ? 'var(--fs-radius-lg)' : '0'};
+          }
+        }
       </style>
-      <div class="fs-shell">
-        <div class="fs-header">
+      <div class="fs-shell${this._layout.bare ? ' fs-shell--bare' : ''}">
+        ${
+          this._layout.bare
+            ? `<div class="fs-bare-bar">
+          <button id="fs-new-btn" class="fs-btn fs-btn--primary">+ New Suggestion</button>
+        </div>`
+            : `<div class="fs-header">
           ${this._logo ? `<img class="fs-logo" src="${this._logo}" alt="Logo" />` : ''}
           <p class="fs-tagline">Let us know how we can improve...</p>
           <button id="fs-new-btn" class="fs-btn fs-btn--primary">+ New Suggestion</button>
-        </div>
+        </div>`
+        }
         <div id="fs-form-root"></div>
         <div id="fs-feed-root"></div>
         <div id="fs-dialog-root"></div>
@@ -528,13 +603,29 @@ class FeatureSuggestionsElement extends HTMLElement {
       this._loading,
       this._sort,
       this._searchQuery,
+      this._layout.filterStyle ?? 'pill-row',
+      this._filterStatus,
+      this._filterType,
     );
     this.bindFeedEvents();
   }
 
-  private renderDetailDialog(): void {
+  private renderDialogRoot(): void {
     const container = this._root.getElementById('fs-dialog-root');
     if (!container) return;
+    if (this._dialogMode === 'none') {
+      container.innerHTML = '';
+      return;
+    }
+    if (this._dialogMode === 'form') {
+      this.renderFormDialog(container);
+      return;
+    }
+    // 'detail'
+    this.renderDetailDialog(container);
+  }
+
+  private renderDetailDialog(container: HTMLElement): void {
     if (!this._activeSuggestionId) {
       container.innerHTML = '';
       return;
@@ -623,31 +714,97 @@ class FeatureSuggestionsElement extends HTMLElement {
     container.querySelector<HTMLElement>('.fs-dialog')?.focus();
   }
 
+  private renderFormDialog(container: HTMLElement): void {
+    container.innerHTML = `
+      <div class="fs-dialog-overlay" id="fs-dialog-overlay" role="presentation">
+        <div
+          class="fs-dialog"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="fs-form-dialog-title"
+          tabindex="-1"
+        >
+          <button
+            id="fs-dialog-close"
+            class="fs-dialog-close"
+            type="button"
+            aria-label="Close dialog"
+          >
+            ✕
+          </button>
+          ${renderSubmissionFormHTML(this._formState)}
+        </div>
+      </div>
+    `;
+
+    const closeFormDialog = () => {
+      this._dialogMode = 'none';
+      this._formState = { title: '', details: '', type: 'New Feature', error: null };
+      this.renderDialogRoot();
+    };
+
+    container.querySelector('#fs-dialog-close')?.addEventListener('click', closeFormDialog);
+    container.querySelector('#fs-dialog-overlay')?.addEventListener('click', event => {
+      if (event.target === event.currentTarget) closeFormDialog();
+    });
+    container.addEventListener('keydown', event => {
+      if (event.key === 'Escape') { event.preventDefault(); closeFormDialog(); }
+    });
+
+    this.bindFormEvents();
+    container.querySelector<HTMLElement>('.fs-dialog')?.focus();
+  }
+
   private async openDetail(suggestionId: string): Promise<void> {
     if (!this._adapter) return;
+
+    // Emit composed event — host can intercept (preventDefault) to use its own dialog
+    const openEvent = new CustomEvent('fs:open-detail', {
+      bubbles: true,
+      composed: true,
+      cancelable: true,
+      detail: { suggestionId },
+    });
+    if (!this.dispatchEvent(openEvent)) return; // host handles the dialog
+
     this._activeSuggestionId = suggestionId;
-    // fetch comments and vote state
+    this._dialogMode = 'detail';
+    this._comments = [];
+    this._userVoted = false;
+    this._statusError = null;
+
+    // Render immediately with optimistic unvoted state (no 404 blocks the dialog open)
+    this.renderDialogRoot();
+
+    // Fetch comments and vote state in parallel
     try {
-      this._comments = await this._adapter.getComments(suggestionId);
-      if (this._user) {
-        const vote = await this._adapter.getVote(suggestionId, this._user.id);
-        this._userVoted = !!vote;
-      } else {
-        this._userVoted = false;
-      }
+      const [comments, vote] = await Promise.all([
+        this._adapter.getComments(suggestionId),
+        this._user
+          ? this._adapter.getVote(suggestionId, this._user.id)
+          : Promise.resolve(null),
+      ]);
+      this._comments = comments;
+      // getVote returns null on 404 (no vote) — treated as unvoted, no error
+      this._userVoted = vote !== null;
     } catch {
       this._comments = [];
       this._userVoted = false;
     }
-    this.renderDetailDialog();
+
+    // Re-render with loaded data only if this dialog is still open
+    if (this._activeSuggestionId === suggestionId) {
+      this.renderDialogRoot();
+    }
   }
 
   private closeDetail(): void {
     this._activeSuggestionId = null;
+    this._dialogMode = 'none';
     this._comments = [];
     this._userVoted = false;
     this._statusError = null;
-    this.renderDetailDialog();
+    this.renderDialogRoot();
   }
 
   private bindDetailEvents(): void {
@@ -690,7 +847,7 @@ class FeatureSuggestionsElement extends HTMLElement {
         this._userVoted = true;
       }
       this.renderFeed();
-      this.renderDetailDialog();
+      this.renderDialogRoot();
     });
 
     const statusSelect =
@@ -711,12 +868,12 @@ class FeatureSuggestionsElement extends HTMLElement {
         await this._adapter.setStatus(this._activeSuggestionId, newStatus);
         suggestion.status = newStatus;
         this.renderFeed();
-        this.renderDetailDialog();
+        this.renderDialogRoot();
       } catch {
         suggestion.status = prevStatus;
         this._statusError = "Couldn't save status. Try again.";
         this.renderFeed();
-        this.renderDetailDialog();
+        this.renderDialogRoot();
       }
     });
 
@@ -740,7 +897,7 @@ class FeatureSuggestionsElement extends HTMLElement {
       );
       if (suggestion) suggestion.commentCount = suggestion.commentCount + 1;
       this.renderFeed();
-      this.renderDetailDialog();
+      this.renderDialogRoot();
     });
   }
 
@@ -757,14 +914,33 @@ class FeatureSuggestionsElement extends HTMLElement {
 
   private bindShellEvents(): void {
     this._root.getElementById('fs-new-btn')?.addEventListener('click', () => {
-      this._showForm = true;
-      this._formState = {
-        title: '',
-        details: '',
-        type: 'New Feature',
-        error: null,
-      };
-      this.renderFormSection();
+      const formMode = this._layout.formMode ?? 'modal';
+      if (formMode === 'inline') {
+        this._showForm = true;
+        this._formState = {
+          title: '',
+          details: '',
+          type: 'New Feature',
+          error: null,
+        };
+        this.renderFormSection();
+      } else {
+        // Modal mode: emit composed event so host can intercept and use its own dialog
+        const event = new CustomEvent('fs:open-form', {
+          bubbles: true,
+          composed: true,
+          cancelable: true,
+        });
+        if (!this.dispatchEvent(event)) return; // host handles the dialog
+        this._dialogMode = 'form';
+        this._formState = {
+          title: '',
+          details: '',
+          type: 'New Feature',
+          error: null,
+        };
+        this.renderDialogRoot();
+      }
     });
   }
 
@@ -787,6 +963,28 @@ class FeatureSuggestionsElement extends HTMLElement {
       .forEach(btn => {
         btn.addEventListener('click', () => {
           this._sort = btn.dataset['sort'] as SortOption;
+          this.renderFeed();
+        });
+      });
+
+    // Filter pills — status
+    this._root
+      .querySelectorAll<HTMLButtonElement>('[data-filter-status]')
+      .forEach(btn => {
+        btn.addEventListener('click', () => {
+          const val = btn.dataset['filterStatus'] as SuggestionStatus | '';
+          this._filterStatus = val || null;
+          this.renderFeed();
+        });
+      });
+
+    // Filter pills — type
+    this._root
+      .querySelectorAll<HTMLButtonElement>('[data-filter-type]')
+      .forEach(btn => {
+        btn.addEventListener('click', () => {
+          const val = btn.dataset['filterType'] as SuggestionType | '';
+          this._filterType = val || null;
           this.renderFeed();
         });
       });
@@ -825,41 +1023,51 @@ class FeatureSuggestionsElement extends HTMLElement {
       const error = validateTitle(title);
       if (error) {
         this._formState = { title, details, type, error };
-        this.renderFormSection();
+        if (this._dialogMode === 'form') {
+          this.renderDialogRoot();
+        } else {
+          this.renderFormSection();
+        }
         return;
       }
 
       if (!this._adapter || !this._user) return;
-      void this.submitSuggestion({ title, details, type });
+      void this._doSubmit({ title, details, type });
     });
 
     form.querySelector('.fs-btn--cancel')?.addEventListener('click', () => {
-      this._showForm = false;
-      this._formState = {
-        title: '',
-        details: '',
-        type: 'New Feature',
-        error: null,
-      };
-      this.renderFormSection();
+      this._formState = { title: '', details: '', type: 'New Feature', error: null };
+      if (this._dialogMode === 'form') {
+        this._dialogMode = 'none';
+        this.renderDialogRoot();
+      } else {
+        this._showForm = false;
+        this.renderFormSection();
+      }
     });
   }
 
-  private async submitSuggestion(values: {
+  private async _doSubmit(values: {
     title: string;
     details: string;
     type: SuggestionType;
   }): Promise<void> {
     if (!this._adapter || !this._user) return;
-    const suggestion = await this._adapter.createSuggestion({
+    await this.submitSuggestion({
       title: values.title,
       details: values.details || undefined,
       type: values.type,
       authorId: this._user.id,
       authorName: this._user.name,
     });
+  }
+
+  async submitSuggestion(data: CreateSuggestionInput): Promise<void> {
+    if (!this._adapter) return;
+    const suggestion = await this._adapter.createSuggestion(data);
     this._suggestions = [suggestion, ...this._suggestions];
     this._showForm = false;
+    this._dialogMode = 'none';
     this._formState = {
       title: '',
       details: '',
@@ -868,6 +1076,15 @@ class FeatureSuggestionsElement extends HTMLElement {
     };
     this.renderFeed();
     this.renderFormSection();
+    this.renderDialogRoot();
+  }
+
+  closeForm(): void {
+    this._showForm = false;
+    this._dialogMode = 'none';
+    this._formState = { title: '', details: '', type: 'New Feature', error: null };
+    this.renderFormSection();
+    this.renderDialogRoot();
   }
 }
 
