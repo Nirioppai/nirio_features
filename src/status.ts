@@ -1,4 +1,4 @@
-import type { SuggestionStatus } from './types';
+import type { SuggestionStatus, SuggestionType } from './types';
 
 export const STATUS_OPTIONS: SuggestionStatus[] = [
   'Under Review',
@@ -23,4 +23,18 @@ const STATUS_SLUG_MAP: Record<SuggestionStatus, string> = {
  */
 export function statusToClassName(status: SuggestionStatus): string {
   return STATUS_SLUG_MAP[status] ?? '';
+}
+
+const TYPE_SLUG_MAP: Record<SuggestionType, string> = {
+  'New Feature': 'new-feature',
+  'Feature Update': 'feature-update',
+  'Bug Report': 'bug-report',
+};
+
+/**
+ * Returns the CSS modifier slug for a given suggestion type.
+ * Used as the `fs-card-type--{slug}` class on type badge elements.
+ */
+export function typeToClassName(type: SuggestionType): string {
+  return TYPE_SLUG_MAP[type] ?? '';
 }

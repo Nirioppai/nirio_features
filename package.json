@@ -13,6 +13,16 @@
       "types": "./dist/index.d.ts",
       "import": "./dist/index.esm.js",
       "require": "./dist/index.cjs.js"
+    },
+    "./themes/mui": {
+      "types": "./dist/themes/mui.d.ts",
+      "import": "./dist/themes/mui.esm.js",
+      "require": "./dist/themes/mui.cjs.js"
+    },
+    "./themes/tailwind": {
+      "types": "./dist/themes/tailwind.d.ts",
+      "import": "./dist/themes/tailwind.esm.js",
+      "require": "./dist/themes/tailwind.cjs.js"
     }
   },
   "publishConfig": {

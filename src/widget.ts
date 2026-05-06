@@ -6,7 +6,7 @@ import type {
   Comment,
 } from './types';
 import { renderFeedHTML, type SortOption } from './feed';
-import { STATUS_OPTIONS, statusToClassName } from './status';
+import { STATUS_OPTIONS, statusToClassName, typeToClassName } from './status';
 import {
   renderSubmissionFormHTML,
   validateTitle,
@@ -35,6 +35,7 @@ export interface WidgetTheme {
   primaryColor?: string;
   background?: string;
   font?: string;
+  colorScheme?: 'light' | 'dark' | 'auto';
 }
 
 class FeatureSuggestionsElement extends HTMLElement {
@@ -58,6 +59,8 @@ class FeatureSuggestionsElement extends HTMLElement {
   private _userVoted = false;
   private _statusError: string | null = null;
   private _root: ShadowRoot;
+  private _colorSchemeMedia: MediaQueryList | null = null;
+  private _colorSchemeListener: (() => void) | null = null;
 
   constructor() {
     super();
@@ -132,6 +135,17 @@ class FeatureSuggestionsElement extends HTMLElement {
     }
   }
 
+  disconnectedCallback(): void {
+    if (this._colorSchemeMedia && this._colorSchemeListener) {
+      this._colorSchemeMedia.removeEventListener(
+        'change',
+        this._colorSchemeListener,
+      );
+      this._colorSchemeMedia = null;
+      this._colorSchemeListener = null;
+    }
+  }
+
   private applyTheme(): void {
     const host = this as HTMLElement;
     if (this._theme.primaryColor) {
@@ -142,6 +156,39 @@ class FeatureSuggestionsElement extends HTMLElement {
     }
     if (this._theme.font) {
       host.style.setProperty('--fs-font', this._theme.font);
+    }
+
+    // Tear down any previous media listener before re-applying.
+    if (this._colorSchemeMedia && this._colorSchemeListener) {
+      this._colorSchemeMedia.removeEventListener(
+        'change',
+        this._colorSchemeListener,
+      );
+      this._colorSchemeMedia = null;
+      this._colorSchemeListener = null;
+    }
+
+    const scheme = this._theme.colorScheme ?? 'auto';
+
+    if (scheme === 'dark') {
+      host.setAttribute('data-color-scheme', 'dark');
+    } else if (scheme === 'light') {
+      host.removeAttribute('data-color-scheme');
+    } else {
+      // auto: follow prefers-color-scheme media query
+      const applyAuto = () => {
+        if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
+          host.setAttribute('data-color-scheme', 'dark');
+        } else {
+          host.removeAttribute('data-color-scheme');
+        }
+      };
+      applyAuto();
+      this._colorSchemeMedia = window.matchMedia(
+        '(prefers-color-scheme: dark)',
+      );
+      this._colorSchemeListener = applyAuto;
+      this._colorSchemeMedia.addEventListener('change', applyAuto);
     }
   }
 
@@ -165,111 +212,212 @@ class FeatureSuggestionsElement extends HTMLElement {
           font-family: var(--fs-font, system-ui, sans-serif);
           background: var(--fs-background, #ffffff);
           color: var(--fs-text-color, #111827);
+          /* primary */
+          --fs-primary-color: #6366f1;
+          /* surfaces */
+          --fs-background: #ffffff;
+          --fs-surface: #ffffff;
+          --fs-surface-elevated: #ffffff;
+          --fs-surface-muted: #f3f4f6;
+          /* text */
+          --fs-text-color: #111827;
+          --fs-text-muted: #6b7280;
+          --fs-text-strong: #374151;
+          /* borders */
+          --fs-border: #e5e7eb;
+          --fs-border-strong: #d1d5db;
+          --fs-border-focus: var(--fs-primary-color);
+          /* states */
+          --fs-hover-bg: #f9fafb;
+          --fs-active-bg: #f3f4f6;
+          /* status pills */
+          --fs-status-under-review-bg: #f3f4f6;
+          --fs-status-under-review-fg: #374151;
+          --fs-status-planned-bg: #e0f2fe;
+          --fs-status-planned-fg: #0369a1;
+          --fs-status-in-progress-bg: #fef3c7;
+          --fs-status-in-progress-fg: #d97706;
+          --fs-status-completed-bg: #dcfce7;
+          --fs-status-completed-fg: #16a34a;
+          --fs-status-declined-bg: #fee2e2;
+          --fs-status-declined-fg: #dc2626;
+          /* type pills */
+          --fs-type-new-feature-bg: #ede9fe;
+          --fs-type-new-feature-fg: #6d28d9;
+          --fs-type-feature-update-bg: #e0f2fe;
+          --fs-type-feature-update-fg: #0369a1;
+          --fs-type-bug-report-bg: #fef3c7;
+          --fs-type-bug-report-fg: #d97706;
+          /* error */
+          --fs-error-color: #dc2626;
+          --fs-error-bg: #fef2f2;
+          --fs-error-border: #fecaca;
+          /* backdrop / modal */
+          --fs-backdrop: rgba(0, 0, 0, 0.45);
+          --fs-modal-bg: #ffffff;
+          /* radii */
+          --fs-radius-sm: 6px;
+          --fs-radius-md: 8px;
+          --fs-radius-lg: 12px;
+          /* spacing */
+          --fs-space-1: 4px;
+          --fs-space-2: 8px;
+          --fs-space-3: 12px;
+          --fs-space-4: 16px;
+          --fs-space-5: 20px;
+          --fs-space-6: 24px;
+          /* typography */
+          --fs-font: system-ui, sans-serif;
+          --fs-font-mono: ui-monospace, SFMono-Regular, monospace;
+          --fs-font-size-base: 0.875rem;
+          --fs-font-size-heading: 1.125rem;
+        }
+        :host([data-color-scheme="dark"]) {
+          --fs-background: #1e1e2e;
+          --fs-surface: #1e1e2e;
+          --fs-surface-elevated: #2a2a3c;
+          --fs-surface-muted: #2a2a3c;
+          --fs-text-color: #e2e8f0;
+          --fs-text-muted: #94a3b8;
+          --fs-text-strong: #f1f5f9;
+          --fs-border: #374151;
+          --fs-border-strong: #4b5563;
+          --fs-hover-bg: #2a2a3c;
+          --fs-active-bg: #374151;
+          --fs-status-under-review-bg: #374151;
+          --fs-status-under-review-fg: #d1d5db;
+          --fs-status-planned-bg: #0c4a6e;
+          --fs-status-planned-fg: #bae6fd;
+          --fs-status-in-progress-bg: #451a03;
+          --fs-status-in-progress-fg: #fde68a;
+          --fs-status-completed-bg: #052e16;
+          --fs-status-completed-fg: #86efac;
+          --fs-status-declined-bg: #450a0a;
+          --fs-status-declined-fg: #fca5a5;
+          --fs-type-new-feature-bg: #2e1065;
+          --fs-type-new-feature-fg: #c4b5fd;
+          --fs-type-feature-update-bg: #0c4a6e;
+          --fs-type-feature-update-fg: #bae6fd;
+          --fs-type-bug-report-bg: #451a03;
+          --fs-type-bug-report-fg: #fde68a;
+          --fs-error-color: #f87171;
+          --fs-error-bg: #450a0a;
+          --fs-error-border: #991b1b;
+          --fs-backdrop: rgba(0, 0, 0, 0.7);
+          --fs-modal-bg: #2a2a3c;
         }
         .fs-shell {
           max-width: 720px;
           margin: 0 auto;
-          padding: 24px;
+          padding: var(--fs-space-6);
         }
         .fs-header {
           display: flex;
           flex-direction: column;
           align-items: center;
-          gap: 12px;
-          margin-bottom: 24px;
+          gap: var(--fs-space-3);
+          margin-bottom: var(--fs-space-6);
           text-align: center;
         }
         .fs-logo { max-height: 48px; object-fit: contain; }
-        .fs-tagline { font-size: 1rem; color: var(--fs-text-color, #111827); margin: 0; }
+        .fs-tagline { font-size: 1rem; color: var(--fs-text-color); margin: 0; }
         .fs-feed { display: flex; flex-direction: column; gap: 16px; }
         .fs-controls { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
         .fs-search {
-          flex: 1; min-width: 160px; padding: 8px 12px;
-          border: 1px solid #d1d5db; border-radius: 6px;
-          font-size: 0.875rem; outline: none;
+          flex: 1; min-width: 160px; padding: var(--fs-space-2) var(--fs-space-3);
+          border: 1px solid var(--fs-border-strong); border-radius: var(--fs-radius-sm);
+          font-size: var(--fs-font-size-base); outline: none;
+          background: var(--fs-surface); color: var(--fs-text-color);
         }
-        .fs-search:focus { border-color: var(--fs-primary-color, #6366f1); }
+        .fs-search:focus { border-color: var(--fs-border-focus); }
         .fs-sort-buttons { display: flex; gap: 6px; }
         .fs-sort-btn {
-          padding: 6px 14px; border: 1px solid #d1d5db; border-radius: 6px;
-          background: #fff; font-size: 0.875rem; cursor: pointer;
+          padding: 6px 14px; border: 1px solid var(--fs-border-strong); border-radius: var(--fs-radius-sm);
+          background: var(--fs-surface); color: var(--fs-text-color); font-size: var(--fs-font-size-base); cursor: pointer;
         }
         .fs-sort-btn--active {
-          background: var(--fs-primary-color, #6366f1);
-          color: #fff; border-color: var(--fs-primary-color, #6366f1);
+          background: var(--fs-primary-color);
+          color: #fff; border-color: var(--fs-primary-color);
         }
-        .fs-cards { display: flex; flex-direction: column; gap: 12px; }
+        .fs-cards { display: flex; flex-direction: column; gap: var(--fs-space-3); }
         .fs-card {
-          padding: 16px; border: 1px solid #e5e7eb; border-radius: 8px;
-          cursor: pointer; background: #fff;
+          padding: var(--fs-space-4); border: 1px solid var(--fs-border); border-radius: var(--fs-radius-md);
+          cursor: pointer; background: var(--fs-surface);
         }
-        .fs-card:hover { border-color: var(--fs-primary-color, #6366f1); }
-        .fs-card-header { display: flex; gap: 8px; margin-bottom: 8px; }
-        .fs-card-type, .fs-card-status {
-          font-size: 0.75rem; padding: 2px 8px; border-radius: 4px;
-          background: #f3f4f6; color: #374151;
+        .fs-card:hover { border-color: var(--fs-border-focus); background: var(--fs-hover-bg); }
+        .fs-card-header { display: flex; gap: var(--fs-space-2); margin-bottom: var(--fs-space-2); }
+        .fs-card-type {
+          font-size: 0.75rem; padding: 2px var(--fs-space-2); border-radius: 4px;
+          background: var(--fs-surface-muted); color: var(--fs-text-strong);
         }
-        .fs-card-status { background: #dbeafe; color: #1d4ed8; }
-        .fs-card-status--under-review { background: #f3f4f6; color: #374151; }
-        .fs-card-status--planned { background: #e0f2fe; color: #0369a1; }
-        .fs-card-status--in-progress { background: #fef3c7; color: #d97706; }
-        .fs-card-status--completed { background: #dcfce7; color: #16a34a; }
-        .fs-card-status--declined { background: #fee2e2; color: #dc2626; }
+        .fs-card-type--new-feature { background: var(--fs-type-new-feature-bg); color: var(--fs-type-new-feature-fg); }
+        .fs-card-type--feature-update { background: var(--fs-type-feature-update-bg); color: var(--fs-type-feature-update-fg); }
+        .fs-card-type--bug-report { background: var(--fs-type-bug-report-bg); color: var(--fs-type-bug-report-fg); }
+        .fs-card-status {
+          font-size: 0.75rem; padding: 2px var(--fs-space-2); border-radius: 4px;
+          background: var(--fs-status-under-review-bg); color: var(--fs-status-under-review-fg);
+        }
+        .fs-card-status--under-review { background: var(--fs-status-under-review-bg); color: var(--fs-status-under-review-fg); }
+        .fs-card-status--planned { background: var(--fs-status-planned-bg); color: var(--fs-status-planned-fg); }
+        .fs-card-status--in-progress { background: var(--fs-status-in-progress-bg); color: var(--fs-status-in-progress-fg); }
+        .fs-card-status--completed { background: var(--fs-status-completed-bg); color: var(--fs-status-completed-fg); }
+        .fs-card-status--declined { background: var(--fs-status-declined-bg); color: var(--fs-status-declined-fg); }
         .fs-admin-status {
-          display: flex; flex-direction: column; gap: 4px; padding: 8px 0;
+          display: flex; flex-direction: column; gap: 4px; padding: var(--fs-space-2) 0;
         }
         .fs-admin-status label {
-          font-size: 0.875rem; font-weight: 500; color: #374151;
+          font-size: var(--fs-font-size-base); font-weight: 500; color: var(--fs-text-strong);
         }
         .fs-status-select {
-          padding: 6px 12px; border: 1px solid #d1d5db; border-radius: 6px;
-          font-size: 0.875rem; font-family: inherit; background: #f3f4f6;
-          cursor: pointer; outline: none;
+          padding: 6px var(--fs-space-3); border: 1px solid var(--fs-border-strong); border-radius: var(--fs-radius-sm);
+          font-size: var(--fs-font-size-base); font-family: inherit; background: var(--fs-surface-muted);
+          color: var(--fs-text-color); cursor: pointer; outline: none;
         }
         .fs-status-select:disabled { opacity: 0.6; cursor: not-allowed; }
-        .fs-admin-error { font-size: 0.875rem; color: #dc2626; margin-top: 4px; }
+        .fs-admin-error { font-size: var(--fs-font-size-base); color: var(--fs-error-color); margin-top: 4px; }
         .fs-card-title { margin: 0 0 6px; font-size: 1rem; font-weight: 600; }
-        .fs-card-details { margin: 0 0 8px; font-size: 0.875rem; color: #6b7280; }
-        .fs-card-meta { display: flex; gap: 12px; font-size: 0.8rem; color: #9ca3af; }
-        .fs-state { padding: 32px; text-align: center; color: #9ca3af; }
+        .fs-card-details { margin: 0 0 var(--fs-space-2); font-size: var(--fs-font-size-base); color: var(--fs-text-muted); }
+        .fs-card-meta { display: flex; gap: var(--fs-space-3); font-size: 0.8rem; color: var(--fs-text-muted); }
+        .fs-state { padding: 32px; text-align: center; color: var(--fs-text-muted); }
         .fs-btn {
-          padding: 8px 16px; border: none; border-radius: 6px;
-          font-size: 0.875rem; cursor: pointer; font-family: inherit;
+          padding: var(--fs-space-2) var(--fs-space-4); border: none; border-radius: var(--fs-radius-sm);
+          font-size: var(--fs-font-size-base); cursor: pointer; font-family: inherit;
         }
-        .fs-btn--primary { background: var(--fs-primary-color, #6366f1); color: #fff; }
+        .fs-btn--primary { background: var(--fs-primary-color); color: #fff; }
         .fs-btn--primary:hover { opacity: 0.9; }
         .fs-btn--cancel {
-          background: transparent; border: 1px solid #d1d5db; color: #374151;
+          background: transparent; border: 1px solid var(--fs-border-strong); color: var(--fs-text-color);
         }
         .fs-form {
-          background: #fff; border: 1px solid #e5e7eb; border-radius: 8px;
-          padding: 20px; margin-bottom: 24px;
+          background: var(--fs-surface); border: 1px solid var(--fs-border); border-radius: var(--fs-radius-md);
+          padding: var(--fs-space-5); margin-bottom: var(--fs-space-6);
         }
-        .fs-form-title { margin: 0 0 16px; font-size: 1rem; font-weight: 600; }
+        .fs-form-title { margin: 0 0 var(--fs-space-4); font-size: 1rem; font-weight: 600; }
         .fs-form-error {
-          color: #dc2626; background: #fef2f2; border: 1px solid #fecaca;
-          border-radius: 6px; padding: 8px 12px; margin-bottom: 12px;
-          font-size: 0.875rem;
+          color: var(--fs-error-color); background: var(--fs-error-bg); border: 1px solid var(--fs-error-border);
+          border-radius: var(--fs-radius-sm); padding: var(--fs-space-2) var(--fs-space-3); margin-bottom: var(--fs-space-3);
+          font-size: var(--fs-font-size-base);
         }
-        .fs-form-field { display: flex; flex-direction: column; gap: 4px; margin-bottom: 12px; }
-        .fs-form-label { font-size: 0.875rem; font-weight: 500; color: #374151; }
+        .fs-form-field { display: flex; flex-direction: column; gap: 4px; margin-bottom: var(--fs-space-3); }
+        .fs-form-label { font-size: var(--fs-font-size-base); font-weight: 500; color: var(--fs-text-strong); }
         .fs-form-input {
-          padding: 8px 12px; border: 1px solid #d1d5db; border-radius: 6px;
-          font-size: 0.875rem; font-family: inherit; outline: none;
+          padding: var(--fs-space-2) var(--fs-space-3); border: 1px solid var(--fs-border-strong); border-radius: var(--fs-radius-sm);
+          font-size: var(--fs-font-size-base); font-family: inherit; outline: none;
+          background: var(--fs-surface); color: var(--fs-text-color);
         }
-        .fs-form-input:focus { border-color: var(--fs-primary-color, #6366f1); }
-        .fs-form-input--error { border-color: #dc2626; }
+        .fs-form-input:focus { border-color: var(--fs-border-focus); }
+        .fs-form-input--error { border-color: var(--fs-error-color); }
         .fs-form-textarea { resize: vertical; min-height: 80px; }
-        .fs-form-select { background: #fff; cursor: pointer; }
-        .fs-form-actions { display: flex; gap: 8px; margin-top: 16px; }
+        .fs-form-select { background: var(--fs-surface); color: var(--fs-text-color); cursor: pointer; }
+        .fs-form-actions { display: flex; gap: var(--fs-space-2); margin-top: var(--fs-space-4); }
         .fs-dialog-overlay {
           position: fixed;
           inset: 0;
           display: flex;
           align-items: center;
           justify-content: center;
-          padding: 16px;
-          background: rgba(0, 0, 0, 0.45);
+          padding: var(--fs-space-4);
+          background: var(--fs-backdrop);
           z-index: 100;
         }
         .fs-dialog {
@@ -280,45 +428,45 @@ class FeatureSuggestionsElement extends HTMLElement {
           position: relative;
           display: flex;
           flex-direction: column;
-          gap: 16px;
-          padding: 24px;
-          border: 1px solid #e5e7eb;
-          border-radius: 12px;
-          background: var(--fs-background, #ffffff);
-          color: var(--fs-text-color, #111827);
+          gap: var(--fs-space-4);
+          padding: var(--fs-space-6);
+          border: 1px solid var(--fs-border);
+          border-radius: var(--fs-radius-lg);
+          background: var(--fs-modal-bg);
+          color: var(--fs-text-color);
           outline: none;
         }
         .fs-dialog-header {
           display: flex;
           flex-direction: column;
-          gap: 8px;
+          gap: var(--fs-space-2);
           padding-right: 40px;
         }
         .fs-dialog-badges {
           display: flex;
-          gap: 8px;
+          gap: var(--fs-space-2);
           flex-wrap: wrap;
         }
         .fs-dialog-title {
           margin: 0;
-          font-size: 1.125rem;
+          font-size: var(--fs-font-size-heading);
           font-weight: 600;
           line-height: 1.3;
         }
         .fs-dialog-byline {
           font-size: 0.8rem;
-          color: #9ca3af;
+          color: var(--fs-text-muted);
         }
         .fs-dialog-close {
           position: absolute;
-          top: 16px;
-          right: 16px;
+          top: var(--fs-space-4);
+          right: var(--fs-space-4);
           width: 24px;
           height: 24px;
           padding: 0;
           border: none;
           background: transparent;
-          color: #6b7280;
+          color: var(--fs-text-muted);
           font-size: 1rem;
           line-height: 1;
           cursor: pointer;
@@ -326,16 +474,16 @@ class FeatureSuggestionsElement extends HTMLElement {
         .fs-comments-root {
           display: flex;
           flex-direction: column;
-          gap: 16px;
+          gap: var(--fs-space-4);
         }
         .fs-comments-list {
           display: flex;
           flex-direction: column;
-          gap: 8px;
+          gap: var(--fs-space-2);
         }
         .fs-comment {
-          padding-top: 8px;
-          border-top: 1px solid #f3f4f6;
+          padding-top: var(--fs-space-2);
+          border-top: 1px solid var(--fs-surface-muted);
         }
         .fs-comment:first-child {
           padding-top: 0;
@@ -343,17 +491,17 @@ class FeatureSuggestionsElement extends HTMLElement {
         }
         .fs-comment-meta {
           font-size: 0.8rem;
-          color: #6b7280;
+          color: var(--fs-text-muted);
         }
         .fs-comment-body {
           margin-top: 4px;
-          font-size: 0.875rem;
-          color: var(--fs-text-color, #111827);
+          font-size: var(--fs-font-size-base);
+          color: var(--fs-text-color);
         }
         .fs-comment-form {
           display: flex;
           flex-direction: column;
-          gap: 8px;
+          gap: var(--fs-space-2);
         }
       </style>
       <div class="fs-shell">
@@ -444,7 +592,7 @@ class FeatureSuggestionsElement extends HTMLElement {
           </button>
           <div class="fs-dialog-header">
             <div class="fs-dialog-badges">
-              <span class="fs-card-type">${escapeHtml(s.type)}</span>
+              <span class="fs-card-type fs-card-type--${typeToClassName(s.type)}">${escapeHtml(s.type)}</span>
               ${s.status ? `<span class="fs-card-status fs-card-status--${statusToClassName(s.status)}">${escapeHtml(s.status)}</span>` : ''}
             </div>
             <h2 class="fs-dialog-title" id="fs-dialog-title">${escapeHtml(s.title)}</h2>
