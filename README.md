@@ -78,7 +78,8 @@ The widget is a custom element. Register it once, then mount and pass the host-a
 
 - `defineWidget()` — registers the `<feature-suggestions>` element. Safe to call multiple times.
 - `createFirebaseAdapter(firestore)` — factory returning a `StorageAdapter` backed by Firestore.
-- Exported types: `WidgetUser`, `WidgetTheme`, `SortOption` (and the underlying `Suggestion`, `Comment`, `Vote`, `StorageAdapter` types from `src/`).
+- `createHttpAdapter(config)` — factory returning a `StorageAdapter` backed by a host REST API (cookie-auth friendly). See [Integrating with External Projects](#integrating-with-external-projects).
+- Exported types: `WidgetUser`, `WidgetTheme`, `SortOption`, `HttpAdapterConfig` (and the underlying `Suggestion`, `Comment`, `Vote`, `StorageAdapter` types from `src/`).
 
 ### Element properties
 
@@ -90,6 +91,164 @@ The widget is a custom element. Register it once, then mount and pass the host-a
 | `logo`    | `string`                                | URL rendered above the intro tagline.             |
 
 Admin behavior: when `user.role === 'admin'`, the detail dialog exposes a status selector. All users see the resulting status badge on cards and in the dialog.
+
+## Integrating with External Projects
+
+The widget is intentionally decoupled from any specific backend through the `StorageAdapter` interface (`src/adapter.ts`). Two adapters ship with the package:
+
+- `createFirebaseAdapter(firestore)` — for apps that already use Firestore.
+- `createHttpAdapter(config)` — for apps that own their own REST API (e.g. Laravel + Sanctum, Rails, Django, Express).
+
+Hosts can also implement the `StorageAdapter` interface themselves to point the widget at any other backend.
+
+### What a host project must provide
+
+To embed the widget the host project owns four responsibilities:
+
+1. **Authentication** — the widget never logs anyone in. The host authenticates the user (cookie session, JWT, OAuth, whatever) and passes the resulting identity in as the `user` prop.
+2. **A `WidgetUser`** — `{ id, name, email, role }`. Map your internal roles to either `'user'` or `'admin'`. The exact string `user.role === 'admin'` is the only thing that exposes the status selector.
+3. **A storage adapter** — either one of the bundled adapters (configured for your backend) or a custom implementation of `StorageAdapter`.
+4. **CSRF / session bootstrap (if applicable)** — for cookie sessions, run any required pre-flight (e.g. Laravel Sanctum's `GET /sanctum/csrf-cookie`) **before** mounting the widget. The HTTP adapter does not initialize CSRF; it only reads the cookie and forwards it as a header.
+
+### Conventions and interfaces the repository expects
+
+- The `StorageAdapter` interface in `src/adapter.ts` is the integration boundary. Anything that implements those eight methods is a valid backend.
+- The widget owns all rendering, event handling, optimistic updates, and shadow-DOM styling. **It never calls `fetch` directly.**
+- The host owns auth, CSRF, identity mapping, and adapter construction.
+- Types in `src/types.ts` (`Suggestion`, `Comment`, `Vote`, etc.) are the shared vocabulary between the widget and any adapter.
+- Admin gating is by exact string equality on `user.role === 'admin'`. Map your role taxonomy accordingly.
+
+### Using the bundled HTTP adapter (`createHttpAdapter`)
+
+`createHttpAdapter` translates the eight `StorageAdapter` methods into HTTP calls against a REST resource. It uses only `globalThis.fetch` (no extra dependencies) and is friendly to cookie-based session auth (Laravel Sanctum, Rails session, etc.).
+
+Endpoint contract the host must serve under `{baseUrl}{resourcePath}` (default `resourcePath` is `/api/feature-suggestions`):
+
+| Method   | Path             | Request body               | Response                              |
+| -------- | ---------------- | -------------------------- | ------------------------------------- |
+| `GET`    | `/`              | —                          | `Suggestion[]`                        |
+| `POST`   | `/`              | `{ title, details, type }` | `Suggestion`                          |
+| `PATCH`  | `/{id}/status`   | `{ status }`               | (any 2xx)                             |
+| `GET`    | `/{id}/vote`     | —                          | `{ suggestion_id, user_id }` or `404` |
+| `POST`   | `/{id}/vote`     | —                          | (any 2xx)                             |
+| `DELETE` | `/{id}/vote`     | —                          | (any 2xx)                             |
+| `GET`    | `/{id}/comments` | —                          | `Comment[]`                           |
+| `POST`   | `/{id}/comments` | `{ body }`                 | `Comment`                             |
+
+JSON shapes (server returns `snake_case`; the adapter maps to the `camelCase` types in `src/types.ts`):
+
+```jsonc
+// Suggestion
+{
+  "id": "string-or-number",
+  "title": "...",
+  "details": "..." | null,
+  "type": "New Feature" | "Feature Update" | "Bug Report",
+  "status": "Under Review" | "Planned" | "In Progress" | "Completed" | "Declined" | null,
+  "author_id": "...",
+  "author_name": "...",
+  "vote_count": 0,
+  "comment_count": 0,
+  "created_at": "2026-05-06T12:34:56+00:00"   // ISO 8601 → mapped to Date
+}
+
+// Comment
+{
+  "id": "...",
+  "suggestion_id": "...",
+  "author_id": "...",
+  "author_name": "...",
+  "body": "...",
+  "created_at": "2026-05-06T12:34:56+00:00"
+}
+
+// Error envelope (any non-2xx)
+{ "message": "human-readable", "code": "MACHINE_CODE", "errors": { "field": ["..."] } }
+```
+
+Behavioral guarantees of the HTTP adapter:
+
+- Every request sets `credentials: 'include'` and `Accept: 'application/json'`.
+- Mutating requests (`POST` / `PATCH` / `PUT` / `DELETE`) URL-decode the `XSRF-TOKEN` cookie and send it as `X-XSRF-TOKEN`. Cookie + header names are configurable (`csrfCookieName`, `csrfHeaderName`); pass `csrfCookieName: null` to disable.
+- `getVote` returns `null` on 404; all other non-2xx responses throw an `Error` whose `.message` is the server's `message` field (or `HTTP {status}`) and whose `.body` is the parsed envelope.
+- `created_at` strings are parsed to `Date`. Field names are mapped `snake_case` → `camelCase`.
+- The `userId` argument on the vote methods is ignored on the wire — the server is expected to derive identity from the session.
+
+End-to-end example (host owns auth + CSRF, widget renders + persists):
+
+```ts
+import {
+  defineWidget,
+  createHttpAdapter,
+} from '@nirioppai/feature-suggestions';
+
+// 1. Host bootstraps its own session + CSRF (e.g. Laravel Sanctum)
+await fetch('https://api.example.com/sanctum/csrf-cookie', {
+  credentials: 'include',
+});
+const me = await fetch('https://api.example.com/api/auth/me', {
+  credentials: 'include',
+}).then(r => r.json());
+
+// 2. Build the adapter against the host's REST API
+const adapter = createHttpAdapter({
+  baseUrl: 'https://api.example.com',
+  // resourcePath: '/api/feature-suggestions',  // default
+  // csrfCookieName: 'XSRF-TOKEN',              // default
+  // csrfHeaderName: 'X-XSRF-TOKEN',            // default
+});
+
+// 3. Mount the widget with the host's identity
+defineWidget();
+const el = document.createElement('feature-suggestions');
+el.user = {
+  id: String(me.id),
+  name: me.name,
+  email: me.email,
+  role: me.role === 'admin_user' ? 'admin' : 'user',
+};
+el.adapter = adapter;
+el.theme = { primaryColor: '#5b6cff' };
+el.logo = '/logo.svg';
+document.body.appendChild(el);
+```
+
+### Pointing the widget at any other backend
+
+If neither bundled adapter fits, implement `StorageAdapter` yourself:
+
+```ts
+import type { StorageAdapter } from '@nirioppai/feature-suggestions';
+
+const adapter: StorageAdapter = {
+  async getSuggestions() {
+    /* … */
+  },
+  async createSuggestion(input) {
+    /* … */
+  },
+  async setStatus(id, status) {
+    /* … */
+  },
+  async getVote(id, userId) {
+    /* … */
+  },
+  async addVote(id, userId) {
+    /* … */
+  },
+  async removeVote(id, userId) {
+    /* … */
+  },
+  async getComments(id) {
+    /* … */
+  },
+  async addComment(id, input) {
+    /* … */
+  },
+};
+```
+
+Pass it as `el.adapter` exactly the same way. The widget cannot tell the difference.
 
 ## Development
 

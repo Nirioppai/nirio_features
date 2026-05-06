@@ -2,6 +2,8 @@
 
 export type { StorageAdapter } from './adapter';
 export { createFirebaseAdapter } from './adapters/firebase';
+export { createHttpAdapter } from './adapters/http';
+export type { HttpAdapterConfig } from './adapters/http';
 export type {
   Suggestion,
   Comment,
