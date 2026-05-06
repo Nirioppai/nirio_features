@@ -268,6 +268,7 @@ describe('Detail dialog, voting, and comments', () => {
       createdAt: new Date(),
       voteCount: 2,
       commentCount: 0,
+      status: 'Planned' as const,
     };
     const adapter = makeMockAdapter({
       getSuggestions: vi.fn().mockResolvedValue([suggestion]),
@@ -286,8 +287,52 @@ describe('Detail dialog, voting, and comments', () => {
     // wait for openDetail to fetch comments/vote and render
     await new Promise(r => setTimeout(r, 0));
 
+    expect(el.shadowRoot!.querySelector('[role="dialog"]')).not.toBeNull();
     expect(el.shadowRoot!.innerHTML).toContain('Improve search');
+    expect(el.shadowRoot!.innerHTML).toContain('Planned');
     expect(el.shadowRoot!.querySelector('#fs-upvote-btn')).not.toBeNull();
+  });
+
+  it('closes detail dialog from the close button and Escape key', async () => {
+    const suggestion = {
+      id: 's-close',
+      title: 'Close behavior',
+      type: 'New Feature' as const,
+      authorId: 'u1',
+      authorName: 'Alice',
+      createdAt: new Date(),
+      voteCount: 0,
+      commentCount: 0,
+    };
+    const adapter = makeMockAdapter({
+      getSuggestions: vi.fn().mockResolvedValue([suggestion]),
+      getComments: vi.fn().mockResolvedValue([]),
+      getVote: vi.fn().mockResolvedValue(null),
+    });
+    (el as unknown as { adapter: StorageAdapter }).adapter = adapter;
+    await new Promise(r => setTimeout(r, 0));
+
+    const card = el.shadowRoot!.querySelector('.fs-card') as HTMLElement;
+    card.click();
+    await new Promise(r => setTimeout(r, 0));
+
+    el.shadowRoot!.querySelector<HTMLButtonElement>(
+      '#fs-dialog-close',
+    )!.click();
+    await new Promise(r => setTimeout(r, 0));
+
+    expect(el.shadowRoot!.querySelector('[role="dialog"]')).toBeNull();
+
+    card.click();
+    await new Promise(r => setTimeout(r, 0));
+
+    const dialog = el.shadowRoot!.querySelector<HTMLElement>('.fs-dialog')!;
+    dialog.dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }),
+    );
+    await new Promise(r => setTimeout(r, 0));
+
+    expect(el.shadowRoot!.querySelector('[role="dialog"]')).toBeNull();
   });
 
   it('toggles vote via adapter.addVote / removeVote and updates counts', async () => {
@@ -381,8 +426,44 @@ describe('Detail dialog, voting, and comments', () => {
     expect(el.shadowRoot!.innerHTML).toContain('💬 1');
   });
 
-  it('shows status selector for admin and persists status via adapter', async () => {
-    // make this element admin
+  it('does not submit an empty comment', async () => {
+    const suggestion = {
+      id: 's4-empty',
+      title: 'Empty comment guard',
+      type: 'Feature Update' as const,
+      authorId: 'u1',
+      authorName: 'Alice',
+      createdAt: new Date(),
+      voteCount: 0,
+      commentCount: 0,
+    };
+    const addComment = vi.fn().mockResolvedValue(undefined);
+    const adapter = makeMockAdapter({
+      getSuggestions: vi.fn().mockResolvedValue([suggestion]),
+      getComments: vi.fn().mockResolvedValue([]),
+      getVote: vi.fn().mockResolvedValue(null),
+      addComment,
+    });
+    (el as unknown as { adapter: StorageAdapter }).adapter = adapter;
+    await new Promise(r => setTimeout(r, 0));
+
+    const card = el.shadowRoot!.querySelector('.fs-card') as HTMLElement;
+    card.click();
+    await new Promise(r => setTimeout(r, 0));
+
+    const textarea =
+      el.shadowRoot!.querySelector<HTMLTextAreaElement>('#fs-comment-body')!;
+    textarea.value = '   ';
+    el.shadowRoot!.querySelector<HTMLFormElement>(
+      '#fs-comment-form',
+    )!.dispatchEvent(new Event('submit'));
+    await new Promise(r => setTimeout(r, 0));
+
+    expect(addComment).not.toHaveBeenCalled();
+    expect(el.shadowRoot!.innerHTML).toContain('💬 0');
+  });
+
+  it('admin users see the Update Status selector in the detail dialog', async () => {
     (el as unknown as { user: WidgetUser }).user = {
       id: 'u2',
       name: 'Bob',
@@ -398,13 +479,12 @@ describe('Detail dialog, voting, and comments', () => {
       createdAt: new Date(),
       voteCount: 0,
       commentCount: 0,
+      status: 'Planned' as const,
     };
-    const setStatus = vi.fn().mockResolvedValue(undefined);
     const adapter = makeMockAdapter({
       getSuggestions: vi.fn().mockResolvedValue([suggestion]),
       getComments: vi.fn().mockResolvedValue([]),
       getVote: vi.fn().mockResolvedValue(null),
-      setStatus,
     });
     (el as unknown as { adapter: StorageAdapter }).adapter = adapter;
     await new Promise(r => setTimeout(r, 0));
@@ -413,21 +493,14 @@ describe('Detail dialog, voting, and comments', () => {
     card.click();
     await new Promise(r => setTimeout(r, 0));
 
-    const select =
-      el.shadowRoot!.querySelector<HTMLSelectElement>('#fs-status-select');
+    const select = el.shadowRoot!.querySelector<HTMLSelectElement>('#fs-status-select');
     expect(select).not.toBeNull();
-    // change status
-    select!.value = 'Planned';
-    select!.dispatchEvent(new Event('change'));
-    await new Promise(r => setTimeout(r, 0));
-
-    expect(setStatus).toHaveBeenCalledWith('s5', 'Planned');
-    // status badge should appear on feed and dialog
+    expect(el.shadowRoot!.innerHTML).toContain('Update Status');
+    // Status badge is still visible to all users
     expect(el.shadowRoot!.innerHTML).toContain('Planned');
   });
 
-  it('does not show status selector for non-admin users', async () => {
-    // ensure role is user
+  it('non-admin users do not see the status selector but do see the status badge', async () => {
     (el as unknown as { user: WidgetUser }).user = {
       id: 'u2',
       name: 'Bob',
@@ -443,6 +516,7 @@ describe('Detail dialog, voting, and comments', () => {
       createdAt: new Date(),
       voteCount: 0,
       commentCount: 0,
+      status: 'In Progress' as const,
     };
     const adapter = makeMockAdapter({
       getSuggestions: vi.fn().mockResolvedValue([suggestion]),
@@ -456,8 +530,91 @@ describe('Detail dialog, voting, and comments', () => {
     card.click();
     await new Promise(r => setTimeout(r, 0));
 
-    const select =
-      el.shadowRoot!.querySelector<HTMLSelectElement>('#fs-status-select');
-    expect(select).toBeNull();
+    expect(el.shadowRoot!.querySelector('#fs-status-select')).toBeNull();
+    expect(el.shadowRoot!.innerHTML).toContain('In Progress');
+  });
+
+  it('admin status change calls setStatus and updates the badge on success', async () => {
+    (el as unknown as { user: WidgetUser }).user = {
+      id: 'u2',
+      name: 'Bob',
+      email: 'bob@example.com',
+      role: 'admin',
+    };
+    const suggestion = {
+      id: 's-admin-ok',
+      title: 'Status persistence test',
+      type: 'New Feature' as const,
+      authorId: 'u1',
+      authorName: 'Alice',
+      createdAt: new Date(),
+      voteCount: 0,
+      commentCount: 0,
+      status: 'Planned' as const,
+    };
+    const setStatus = vi.fn().mockResolvedValue(undefined);
+    const adapter = makeMockAdapter({
+      getSuggestions: vi.fn().mockResolvedValue([suggestion]),
+      getComments: vi.fn().mockResolvedValue([]),
+      getVote: vi.fn().mockResolvedValue(null),
+      setStatus,
+    });
+    (el as unknown as { adapter: StorageAdapter }).adapter = adapter;
+    await new Promise(r => setTimeout(r, 0));
+
+    const card = el.shadowRoot!.querySelector('.fs-card') as HTMLElement;
+    card.click();
+    await new Promise(r => setTimeout(r, 0));
+
+    const select = el.shadowRoot!.querySelector<HTMLSelectElement>('#fs-status-select')!;
+    select.value = 'In Progress';
+    select.dispatchEvent(new Event('change'));
+    await new Promise(r => setTimeout(r, 0));
+
+    expect(setStatus).toHaveBeenCalledWith('s-admin-ok', 'In Progress');
+    expect(el.shadowRoot!.innerHTML).toContain('In Progress');
+    expect(el.shadowRoot!.innerHTML).not.toContain("Couldn't save status");
+  });
+
+  it('admin status change restores prior value and shows error on setStatus failure', async () => {
+    (el as unknown as { user: WidgetUser }).user = {
+      id: 'u2',
+      name: 'Bob',
+      email: 'bob@example.com',
+      role: 'admin',
+    };
+    const suggestion = {
+      id: 's-admin-fail',
+      title: 'Status rollback test',
+      type: 'New Feature' as const,
+      authorId: 'u1',
+      authorName: 'Alice',
+      createdAt: new Date(),
+      voteCount: 0,
+      commentCount: 0,
+      status: 'Planned' as const,
+    };
+    const setStatus = vi.fn().mockRejectedValue(new Error('Network error'));
+    const adapter = makeMockAdapter({
+      getSuggestions: vi.fn().mockResolvedValue([suggestion]),
+      getComments: vi.fn().mockResolvedValue([]),
+      getVote: vi.fn().mockResolvedValue(null),
+      setStatus,
+    });
+    (el as unknown as { adapter: StorageAdapter }).adapter = adapter;
+    await new Promise(r => setTimeout(r, 0));
+
+    const card = el.shadowRoot!.querySelector('.fs-card') as HTMLElement;
+    card.click();
+    await new Promise(r => setTimeout(r, 0));
+
+    const select = el.shadowRoot!.querySelector<HTMLSelectElement>('#fs-status-select')!;
+    select.value = 'In Progress';
+    select.dispatchEvent(new Event('change'));
+    await new Promise(r => setTimeout(r, 0));
+
+    expect(el.shadowRoot!.innerHTML).toContain("Couldn't save status. Try again.");
+    // Suggestion status unchanged — badge still shows Planned
+    expect(el.shadowRoot!.innerHTML).toContain('Planned');
   });
 });

@@ -1,6 +1,7 @@
 import type { StorageAdapter } from './adapter';
-import type { Suggestion, SuggestionType, Comment } from './types';
+import type { Suggestion, SuggestionType, SuggestionStatus, Comment } from './types';
 import { renderFeedHTML, type SortOption } from './feed';
+import { STATUS_OPTIONS, statusToClassName } from './status';
 import {
   renderSubmissionFormHTML,
   validateTitle,
@@ -50,6 +51,7 @@ class FeatureSuggestionsElement extends HTMLElement {
   private _activeSuggestionId: string | null = null;
   private _comments: Comment[] = [];
   private _userVoted = false;
+  private _statusError: string | null = null;
   private _root: ShadowRoot;
 
   constructor() {
@@ -203,6 +205,24 @@ class FeatureSuggestionsElement extends HTMLElement {
           background: #f3f4f6; color: #374151;
         }
         .fs-card-status { background: #dbeafe; color: #1d4ed8; }
+        .fs-card-status--under-review { background: #f3f4f6; color: #374151; }
+        .fs-card-status--planned { background: #e0f2fe; color: #0369a1; }
+        .fs-card-status--in-progress { background: #fef3c7; color: #d97706; }
+        .fs-card-status--completed { background: #dcfce7; color: #16a34a; }
+        .fs-card-status--declined { background: #fee2e2; color: #dc2626; }
+        .fs-admin-status {
+          display: flex; flex-direction: column; gap: 4px; padding: 8px 0;
+        }
+        .fs-admin-status label {
+          font-size: 0.875rem; font-weight: 500; color: #374151;
+        }
+        .fs-status-select {
+          padding: 6px 12px; border: 1px solid #d1d5db; border-radius: 6px;
+          font-size: 0.875rem; font-family: inherit; background: #f3f4f6;
+          cursor: pointer; outline: none;
+        }
+        .fs-status-select:disabled { opacity: 0.6; cursor: not-allowed; }
+        .fs-admin-error { font-size: 0.875rem; color: #dc2626; margin-top: 4px; }
         .fs-card-title { margin: 0 0 6px; font-size: 1rem; font-weight: 600; }
         .fs-card-details { margin: 0 0 8px; font-size: 0.875rem; color: #6b7280; }
         .fs-card-meta { display: flex; gap: 12px; font-size: 0.8rem; color: #9ca3af; }
@@ -237,6 +257,99 @@ class FeatureSuggestionsElement extends HTMLElement {
         .fs-form-textarea { resize: vertical; min-height: 80px; }
         .fs-form-select { background: #fff; cursor: pointer; }
         .fs-form-actions { display: flex; gap: 8px; margin-top: 16px; }
+        .fs-dialog-overlay {
+          position: fixed;
+          inset: 0;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          padding: 16px;
+          background: rgba(0, 0, 0, 0.45);
+          z-index: 100;
+        }
+        .fs-dialog {
+          width: 100%;
+          max-width: 560px;
+          max-height: 80vh;
+          overflow-y: auto;
+          position: relative;
+          display: flex;
+          flex-direction: column;
+          gap: 16px;
+          padding: 24px;
+          border: 1px solid #e5e7eb;
+          border-radius: 12px;
+          background: var(--fs-background, #ffffff);
+          color: var(--fs-text-color, #111827);
+          outline: none;
+        }
+        .fs-dialog-header {
+          display: flex;
+          flex-direction: column;
+          gap: 8px;
+          padding-right: 40px;
+        }
+        .fs-dialog-badges {
+          display: flex;
+          gap: 8px;
+          flex-wrap: wrap;
+        }
+        .fs-dialog-title {
+          margin: 0;
+          font-size: 1.125rem;
+          font-weight: 600;
+          line-height: 1.3;
+        }
+        .fs-dialog-byline {
+          font-size: 0.8rem;
+          color: #9ca3af;
+        }
+        .fs-dialog-close {
+          position: absolute;
+          top: 16px;
+          right: 16px;
+          width: 24px;
+          height: 24px;
+          padding: 0;
+          border: none;
+          background: transparent;
+          color: #6b7280;
+          font-size: 1rem;
+          line-height: 1;
+          cursor: pointer;
+        }
+        .fs-comments-root {
+          display: flex;
+          flex-direction: column;
+          gap: 16px;
+        }
+        .fs-comments-list {
+          display: flex;
+          flex-direction: column;
+          gap: 8px;
+        }
+        .fs-comment {
+          padding-top: 8px;
+          border-top: 1px solid #f3f4f6;
+        }
+        .fs-comment:first-child {
+          padding-top: 0;
+          border-top: none;
+        }
+        .fs-comment-meta {
+          font-size: 0.8rem;
+          color: #6b7280;
+        }
+        .fs-comment-body {
+          margin-top: 4px;
+          font-size: 0.875rem;
+          color: var(--fs-text-color, #111827);
+        }
+        .fs-comment-form {
+          display: flex;
+          flex-direction: column;
+          gap: 8px;
+        }
       </style>
       <div class="fs-shell">
         <div class="fs-header">
@@ -289,41 +402,59 @@ class FeatureSuggestionsElement extends HTMLElement {
       )
       .join('');
 
+    const details = s.details?.trim() || 'No additional details provided.';
+
+    const adminSectionHtml =
+      this._user?.role === 'admin'
+        ? `<div class="fs-admin-status">
+            <label for="fs-status-select">Update Status</label>
+            <select id="fs-status-select" aria-label="Update suggestion status">
+              <option value="">No Status</option>
+              ${STATUS_OPTIONS.map(
+                opt =>
+                  `<option value="${opt}"${s.status === opt ? ' selected' : ''}>${opt}</option>`,
+              ).join('')}
+            </select>
+            ${this._statusError ? `<div class="fs-admin-error">${escapeHtml(this._statusError)}</div>` : ''}
+          </div>`
+        : '';
+
     container.innerHTML = `
-      <div class="fs-dialog" role="dialog" aria-modal="true">
-        <div class="fs-dialog-content">
-          <button id="fs-dialog-close" class="fs-btn fs-btn--cancel">Close</button>
-          <h2 class="fs-card-title">${escapeHtml(s.title)}</h2>
-          <div class="fs-card-header">
-            <span class="fs-card-type">${escapeHtml(s.type)}</span>
-            ${s.status ? `<span class="fs-card-status">${escapeHtml(s.status)}</span>` : ''}
-          </div>
-          ${
-            this._user?.role === 'admin'
-              ? `
-            <div class="fs-admin-status">
-              <label for="fs-status-select">Status:</label>
-              <select id="fs-status-select" class="fs-form-select">
-                <option value="">(none)</option>
-                <option value="Under Review" ${s.status === 'Under Review' ? 'selected' : ''}>Under Review</option>
-                <option value="Planned" ${s.status === 'Planned' ? 'selected' : ''}>Planned</option>
-                <option value="In Progress" ${s.status === 'In Progress' ? 'selected' : ''}>In Progress</option>
-                <option value="Completed" ${s.status === 'Completed' ? 'selected' : ''}>Completed</option>
-                <option value="Declined" ${s.status === 'Declined' ? 'selected' : ''}>Declined</option>
-              </select>
+      <div class="fs-dialog-overlay" id="fs-dialog-overlay" role="presentation">
+        <div
+          class="fs-dialog"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="fs-dialog-title"
+          aria-describedby="fs-dialog-details"
+          tabindex="-1"
+        >
+          <button
+            id="fs-dialog-close"
+            class="fs-dialog-close"
+            type="button"
+            aria-label="Close dialog"
+          >
+            ✕
+          </button>
+          <div class="fs-dialog-header">
+            <div class="fs-dialog-badges">
+              <span class="fs-card-type">${escapeHtml(s.type)}</span>
+              ${s.status ? `<span class="fs-card-status fs-card-status--${statusToClassName(s.status)}">${escapeHtml(s.status)}</span>` : ''}
             </div>
-          `
-              : ''
-          }
-          ${s.details ? `<p class="fs-card-details">${escapeHtml(s.details)}</p>` : ''}
+            <h2 class="fs-dialog-title" id="fs-dialog-title">${escapeHtml(s.title)}</h2>
+            <div class="fs-dialog-byline">by ${escapeHtml(s.authorName)}</div>
+          </div>
+          ${adminSectionHtml}
+          <p class="fs-card-details" id="fs-dialog-details">${escapeHtml(details)}</p>
           <div class="fs-card-meta">
-            <button id="fs-upvote-btn" class="fs-btn fs-btn--primary">▲ ${s.voteCount}${this._userVoted ? ' (voted)' : ''}</button>
+            <button id="fs-upvote-btn" class="fs-btn fs-btn--primary" type="button">▲ ${s.voteCount}${this._userVoted ? ' (voted)' : ''}</button>
             <span class="fs-card-comments">💬 ${s.commentCount}</span>
             <span class="fs-card-author">by ${escapeHtml(s.authorName)}</span>
           </div>
 
           <div class="fs-comments-root">
-            <h3>Comments</h3>
+            <h3>Comments (${this._comments.length})</h3>
             <div class="fs-comments-list">${commentsHtml || '<div class="fs-state">No comments yet.</div>'}</div>
             <form id="fs-comment-form" class="fs-comment-form">
               <textarea id="fs-comment-body" class="fs-form-input fs-form-textarea" placeholder="Add a comment"></textarea>
@@ -335,6 +466,8 @@ class FeatureSuggestionsElement extends HTMLElement {
     `;
 
     this.bindDetailEvents();
+
+    container.querySelector<HTMLElement>('.fs-dialog')?.focus();
   }
 
   private async openDetail(suggestionId: string): Promise<void> {
@@ -360,12 +493,29 @@ class FeatureSuggestionsElement extends HTMLElement {
     this._activeSuggestionId = null;
     this._comments = [];
     this._userVoted = false;
+    this._statusError = null;
     this.renderDetailDialog();
   }
 
   private bindDetailEvents(): void {
     const dialogRoot = this._root.getElementById('fs-dialog-root');
     if (!dialogRoot) return;
+
+    dialogRoot
+      .querySelector('#fs-dialog-overlay')
+      ?.addEventListener('click', event => {
+        if (event.target === event.currentTarget) {
+          this.closeDetail();
+        }
+      });
+
+    dialogRoot.addEventListener('keydown', event => {
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        this.closeDetail();
+      }
+    });
+
     dialogRoot
       .querySelector('#fs-dialog-close')
       ?.addEventListener('click', () => this.closeDetail());
@@ -390,6 +540,33 @@ class FeatureSuggestionsElement extends HTMLElement {
       this.renderDetailDialog();
     });
 
+    const statusSelect =
+      dialogRoot.querySelector<HTMLSelectElement>('#fs-status-select');
+    statusSelect?.addEventListener('change', async () => {
+      if (!this._adapter || !this._activeSuggestionId) return;
+      const newValue = statusSelect.value;
+      if (!newValue) return; // "No Status" — no-op
+      const newStatus = newValue as SuggestionStatus;
+      const suggestion = this._suggestions.find(
+        s => s.id === this._activeSuggestionId,
+      );
+      if (!suggestion) return;
+      const prevStatus = suggestion.status;
+      statusSelect.disabled = true;
+      this._statusError = null;
+      try {
+        await this._adapter.setStatus(this._activeSuggestionId, newStatus);
+        suggestion.status = newStatus;
+        this.renderFeed();
+        this.renderDetailDialog();
+      } catch {
+        suggestion.status = prevStatus;
+        this._statusError = "Couldn't save status. Try again.";
+        this.renderFeed();
+        this.renderDetailDialog();
+      }
+    });
+
     const commentForm =
       dialogRoot.querySelector<HTMLFormElement>('#fs-comment-form');
     commentForm?.addEventListener('submit', async e => {
@@ -411,26 +588,6 @@ class FeatureSuggestionsElement extends HTMLElement {
       if (suggestion) suggestion.commentCount = suggestion.commentCount + 1;
       this.renderFeed();
       this.renderDetailDialog();
-    });
-
-    // admin status control - visible only when admin rendered the select
-    const statusSelect =
-      dialogRoot.querySelector<HTMLSelectElement>('#fs-status-select');
-    statusSelect?.addEventListener('change', async e => {
-      if (!this._adapter || !this._activeSuggestionId) return;
-      const val = (e.target as HTMLSelectElement).value;
-      if (!val) return;
-      try {
-        await this._adapter.setStatus(this._activeSuggestionId, val as any);
-        const suggestion = this._suggestions.find(
-          s => s.id === this._activeSuggestionId,
-        );
-        if (suggestion) suggestion.status = val as any;
-        this.renderFeed();
-        this.renderDetailDialog();
-      } catch {
-        // ignore errors for now
-      }
     });
   }
 
