@@ -111,12 +111,15 @@ export function applyTailwindTheme(
   set('--fs-font', fontFamily);
 
   for (const [k, v] of Object.entries(RADIUS_SCALES[radiusScale])) set(k, v);
-  for (const [k, v] of Object.entries(STATUS_PALETTES[statusPalette])) set(k, v);
+  for (const [k, v] of Object.entries(STATUS_PALETTES[statusPalette]))
+    set(k, v);
 
   const resolveScheme = (): 'light' | 'dark' => {
     if (colorScheme === 'dark') return 'dark';
     if (colorScheme === 'light') return 'light';
-    return document.documentElement.classList.contains('dark') ? 'dark' : 'light';
+    return document.documentElement.classList.contains('dark')
+      ? 'dark'
+      : 'light';
   };
 
   const applyScheme = (): void => {

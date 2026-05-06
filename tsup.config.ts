@@ -1,4 +1,4 @@
-import { defineConfig } from 'tsup'
+import { defineConfig } from 'tsup';
 
 export default defineConfig({
   entry: ['src/index.ts', 'src/themes/mui.ts', 'src/themes/tailwind.ts'],
@@ -7,6 +7,6 @@ export default defineConfig({
   clean: true,
   external: ['firebase', /^firebase\//],
   outExtension({ format }) {
-    return { js: format === 'cjs' ? '.cjs.js' : '.esm.js' }
+    return { js: format === 'cjs' ? '.cjs.js' : '.esm.js' };
   },
-})
+});
