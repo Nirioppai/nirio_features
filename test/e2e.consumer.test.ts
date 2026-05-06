@@ -185,7 +185,7 @@ describe('consumer integration (e2e)', () => {
     expect(adapter._comments[0]?.body).toBe('This is a great idea!');
   });
 
-  it('admin can update suggestion status and badge appears for all users', async () => {
+  it('status badge is visible as read-only for all users (status setter removed)', async () => {
     const adapter = createMockAdapter();
     await adapter.createSuggestion({
       title: 'Status test suggestion',
@@ -193,24 +193,22 @@ describe('consumer integration (e2e)', () => {
       authorId: 'admin-1',
       authorName: 'Admin User',
     });
+    // Manually set a status so the badge renders
+    const s = adapter._suggestions[0]!;
+    s.status = 'Planned';
 
     const el = mountWidget({ adapter, userId: 'admin-1', role: 'admin' });
 
     await waitUntil(() => shadowQueryAll(el, '.fs-card').length > 0);
     (shadowQuery(el, '.fs-card') as HTMLElement).click();
 
-    await waitUntil(() => !!shadowQuery(el, '#fs-status-select'));
-    const statusSelect = shadowQuery(
-      el,
-      '#fs-status-select',
-    ) as HTMLSelectElement;
-    expect(statusSelect).toBeTruthy();
+    await waitUntil(() => !!shadowQuery(el, '.fs-dialog'));
 
-    statusSelect.value = 'Planned';
-    statusSelect.dispatchEvent(new Event('change', { bubbles: true }));
-
-    await waitUntil(() => adapter._calls.includes('setStatus'));
-    expect(adapter._suggestions[0]?.status).toBe('Planned');
+    // Status setter no longer exists — status is host-managed
+    expect(shadowQuery(el, '#fs-status-select')).toBeNull();
+    // Status badge is still visible to all users as read-only
+    const dialog = shadowQuery(el, '.fs-dialog');
+    expect(dialog?.innerHTML).toContain('Planned');
   });
 
   it('dialog closes without errors when dismissed', async () => {
