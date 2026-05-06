@@ -82,12 +82,12 @@ The widget is a custom element. Register it once, then mount and pass the host-a
 
 ### Element properties
 
-| Property  | Type                                       | Notes                                                      |
-| --------- | ------------------------------------------ | ---------------------------------------------------------- |
-| `user`    | `{ id, name, email, role }`                | Host app owns auth; widget trusts the value.               |
-| `adapter` | `StorageAdapter`                           | Required; use the Firebase adapter or your own.            |
-| `theme`   | `{ primaryColor?, background?, font? }`    | Maps to CSS custom properties on the shadow root.          |
-| `logo`    | `string`                                   | URL rendered above the intro tagline.                      |
+| Property  | Type                                    | Notes                                             |
+| --------- | --------------------------------------- | ------------------------------------------------- |
+| `user`    | `{ id, name, email, role }`             | Host app owns auth; widget trusts the value.      |
+| `adapter` | `StorageAdapter`                        | Required; use the Firebase adapter or your own.   |
+| `theme`   | `{ primaryColor?, background?, font? }` | Maps to CSS custom properties on the shadow root. |
+| `logo`    | `string`                                | URL rendered above the intro tagline.             |
 
 Admin behavior: when `user.role === 'admin'`, the detail dialog exposes a status selector. All users see the resulting status badge on cards and in the dialog.
 
