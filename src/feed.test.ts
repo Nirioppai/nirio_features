@@ -5,7 +5,7 @@ import {
   renderFeedHTML,
   renderSuggestionCard,
 } from './feed';
-import type { Suggestion } from './types';
+import type { Suggestion, SuggestionStatus } from './types';
 
 function makeSuggestion(overrides: Partial<Suggestion> = {}): Suggestion {
   return {
@@ -142,6 +142,27 @@ describe('renderSuggestionCard', () => {
   it('does not render status badge when status is not set', () => {
     const html = renderSuggestionCard(makeSuggestion({ status: undefined }));
     expect(html).not.toContain('fs-card-status');
+  });
+
+  it('renders semantic modifier class for multi-word status In Progress', () => {
+    const html = renderSuggestionCard(makeSuggestion({ status: 'In Progress' }));
+    expect(html).toContain('fs-card-status--in-progress');
+    expect(html).toContain('In Progress');
+  });
+
+  it('renders the correct semantic modifier class for each Phase 7 status', () => {
+    const cases: Array<[SuggestionStatus, string]> = [
+      ['Under Review', 'fs-card-status--under-review'],
+      ['Planned', 'fs-card-status--planned'],
+      ['In Progress', 'fs-card-status--in-progress'],
+      ['Completed', 'fs-card-status--completed'],
+      ['Declined', 'fs-card-status--declined'],
+    ];
+    cases.forEach(([status, expectedClass]) => {
+      const html = renderSuggestionCard(makeSuggestion({ status }));
+      expect(html).toContain(expectedClass);
+      expect(html).toContain(status);
+    });
   });
 
   it('renders details when present', () => {

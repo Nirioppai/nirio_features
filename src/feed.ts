@@ -1,4 +1,5 @@
 import type { Suggestion } from './types';
+import { statusToClassName } from './status';
 
 export type SortOption = 'trending' | 'most-voted' | 'newest';
 
@@ -29,7 +30,7 @@ export function renderSuggestionCard(s: Suggestion): string {
     <div class="fs-card" data-id="${s.id}" role="button" tabindex="0">
       <div class="fs-card-header">
         <span class="fs-card-type">${escapeHtml(s.type)}</span>
-        ${s.status ? `<span class="fs-card-status">${escapeHtml(s.status)}</span>` : ''}
+        ${s.status ? `<span class="fs-card-status fs-card-status--${statusToClassName(s.status)}">${escapeHtml(s.status)}</span>` : ''}
       </div>
       <h3 class="fs-card-title">${escapeHtml(s.title)}</h3>
       ${s.details ? `<p class="fs-card-details">${escapeHtml(s.details)}</p>` : ''}
