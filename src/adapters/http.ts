@@ -61,6 +61,7 @@ interface ServerComment {
   author_name: string;
   body: string;
   created_at: string;
+  is_admin_response?: boolean;
 }
 
 interface ServerVote {
@@ -311,6 +312,9 @@ function toComment(c: ServerComment): Comment {
     authorName: c.author_name,
     body: c.body,
     createdAt: parseDate(c.created_at),
+    ...(c.is_admin_response !== undefined && {
+      is_admin_response: c.is_admin_response,
+    }),
   };
 }
 

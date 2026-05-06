@@ -27,6 +27,7 @@ export interface Comment {
   authorName: string;
   body: string;
   createdAt: Date;
+  is_admin_response?: boolean;
 }
 
 export interface Vote {

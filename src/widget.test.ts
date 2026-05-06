@@ -368,13 +368,13 @@ describe('Detail dialog, voting, and comments', () => {
     await new Promise(r => setTimeout(r, 0));
 
     expect(addVote).toHaveBeenCalledWith('s3', 'u2');
-    expect(el.shadowRoot!.innerHTML).toContain('▲ 2');
+    expect(el.shadowRoot!.innerHTML).toContain('↑ 2 votes');
 
     // click again to remove
     upvote.click();
     await new Promise(r => setTimeout(r, 0));
     expect(removeVote).toHaveBeenCalledWith('s3', 'u2');
-    expect(el.shadowRoot!.innerHTML).toContain('▲ 1');
+    expect(el.shadowRoot!.innerHTML).toContain('↑ 1 votes');
   });
 
   it('submits a comment and updates comment list and counts', async () => {
@@ -423,7 +423,7 @@ describe('Detail dialog, voting, and comments', () => {
       expect.objectContaining({ body: 'Nice idea', authorId: 'u2' }),
     );
     expect(el.shadowRoot!.innerHTML).toContain('Nice idea');
-    expect(el.shadowRoot!.innerHTML).toContain('💬 1');
+    expect(el.shadowRoot!.innerHTML).toContain('1 comments');
   });
 
   it('does not submit an empty comment', async () => {
@@ -460,10 +460,10 @@ describe('Detail dialog, voting, and comments', () => {
     await new Promise(r => setTimeout(r, 0));
 
     expect(addComment).not.toHaveBeenCalled();
-    expect(el.shadowRoot!.innerHTML).toContain('💬 0');
+    expect(el.shadowRoot!.innerHTML).toContain('0 comments');
   });
 
-  it('admin users see the Update Status selector in the detail dialog', async () => {
+  it('admin users do not see a status setter - status badge is read-only', async () => {
     (el as unknown as { user: WidgetUser }).user = {
       id: 'u2',
       name: 'Bob',
@@ -493,11 +493,10 @@ describe('Detail dialog, voting, and comments', () => {
     card.click();
     await new Promise(r => setTimeout(r, 0));
 
-    const select =
-      el.shadowRoot!.querySelector<HTMLSelectElement>('#fs-status-select');
-    expect(select).not.toBeNull();
-    expect(el.shadowRoot!.innerHTML).toContain('Update Status');
-    // Status badge is still visible to all users
+    // Status setter is removed — no dropdown, no label
+    expect(el.shadowRoot!.querySelector('#fs-status-select')).toBeNull();
+    expect(el.shadowRoot!.innerHTML).not.toContain('Update Status');
+    // Status badge is still visible
     expect(el.shadowRoot!.innerHTML).toContain('Planned');
   });
 
@@ -535,7 +534,7 @@ describe('Detail dialog, voting, and comments', () => {
     expect(el.shadowRoot!.innerHTML).toContain('In Progress');
   });
 
-  it('admin status change calls setStatus and updates the badge on success', async () => {
+  it('admin status change: setStatus not called from widget - host app owns status management', async () => {
     (el as unknown as { user: WidgetUser }).user = {
       id: 'u2',
       name: 'Bob',
@@ -567,41 +566,29 @@ describe('Detail dialog, voting, and comments', () => {
     card.click();
     await new Promise(r => setTimeout(r, 0));
 
-    const select =
-      el.shadowRoot!.querySelector<HTMLSelectElement>('#fs-status-select')!;
-    select.value = 'In Progress';
-    select.dispatchEvent(new Event('change'));
-    await new Promise(r => setTimeout(r, 0));
-
-    expect(setStatus).toHaveBeenCalledWith('s-admin-ok', 'In Progress');
-    expect(el.shadowRoot!.innerHTML).toContain('In Progress');
-    expect(el.shadowRoot!.innerHTML).not.toContain("Couldn't save status");
+    // Widget no longer exposes a status selector — host app owns status management
+    expect(el.shadowRoot!.querySelector('#fs-status-select')).toBeNull();
+    expect(setStatus).not.toHaveBeenCalled();
+    // Status badge still visible as read-only
+    expect(el.shadowRoot!.innerHTML).toContain('Planned');
   });
 
-  it('admin status change restores prior value and shows error on setStatus failure', async () => {
-    (el as unknown as { user: WidgetUser }).user = {
-      id: 'u2',
-      name: 'Bob',
-      email: 'bob@example.com',
-      role: 'admin',
-    };
+  it('hides vote button and comment form for Completed/Declined suggestions (locked state)', async () => {
     const suggestion = {
-      id: 's-admin-fail',
-      title: 'Status rollback test',
+      id: 's-locked',
+      title: 'Locked suggestion',
       type: 'New Feature' as const,
       authorId: 'u1',
       authorName: 'Alice',
       createdAt: new Date(),
-      voteCount: 0,
-      commentCount: 0,
-      status: 'Planned' as const,
+      voteCount: 5,
+      commentCount: 2,
+      status: 'Completed' as const,
     };
-    const setStatus = vi.fn().mockRejectedValue(new Error('Network error'));
     const adapter = makeMockAdapter({
       getSuggestions: vi.fn().mockResolvedValue([suggestion]),
       getComments: vi.fn().mockResolvedValue([]),
       getVote: vi.fn().mockResolvedValue(null),
-      setStatus,
     });
     (el as unknown as { adapter: StorageAdapter }).adapter = adapter;
     await new Promise(r => setTimeout(r, 0));
@@ -610,16 +597,8 @@ describe('Detail dialog, voting, and comments', () => {
     card.click();
     await new Promise(r => setTimeout(r, 0));
 
-    const select =
-      el.shadowRoot!.querySelector<HTMLSelectElement>('#fs-status-select')!;
-    select.value = 'In Progress';
-    select.dispatchEvent(new Event('change'));
-    await new Promise(r => setTimeout(r, 0));
-
-    expect(el.shadowRoot!.innerHTML).toContain(
-      "Couldn't save status. Try again.",
-    );
-    // Suggestion status unchanged — badge still shows Planned
-    expect(el.shadowRoot!.innerHTML).toContain('Planned');
+    expect(el.shadowRoot!.querySelector('#fs-upvote-btn')).toBeNull();
+    expect(el.shadowRoot!.querySelector('#fs-comment-form')).toBeNull();
+    expect(el.shadowRoot!.innerHTML).toContain('This suggestion is closed');
   });
 });

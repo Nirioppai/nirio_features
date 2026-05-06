@@ -8,7 +8,7 @@ import type {
   WidgetLayout,
 } from './types';
 import { renderFeedHTML, type SortOption } from './feed';
-import { STATUS_OPTIONS, statusToClassName, typeToClassName } from './status';
+import { statusToClassName, typeToClassName } from './status';
 import {
   renderSubmissionFormHTML,
   validateTitle,
@@ -524,6 +524,27 @@ class FeatureSuggestionsElement extends HTMLElement {
           font-size: var(--fs-font-size-base);
           color: var(--fs-text-color);
         }
+        .fs-comment--admin {
+          border-left: 3px solid var(--fs-primary-color);
+          padding-left: var(--fs-space-3);
+          background: var(--fs-surface-muted);
+          border-radius: 0 var(--fs-radius-sm) var(--fs-radius-sm) 0;
+        }
+        .fs-comment-admin-badge {
+          font-size: 0.7rem;
+          font-weight: 600;
+          color: var(--fs-primary-color);
+          text-transform: uppercase;
+          letter-spacing: 0.04em;
+          margin-bottom: 4px;
+        }
+        .fs-locked-notice {
+          font-size: var(--fs-font-size-base);
+          color: var(--fs-text-muted);
+          padding: var(--fs-space-2) var(--fs-space-3);
+          background: var(--fs-surface-muted);
+          border-radius: var(--fs-radius-sm);
+        }
         .fs-comment-form {
           display: flex;
           flex-direction: column;
@@ -637,31 +658,31 @@ class FeatureSuggestionsElement extends HTMLElement {
       return;
     }
 
+    const isLocked = s.status === 'Completed' || s.status === 'Declined';
+
     const commentsHtml = this._comments
-      .map(
-        c =>
-          `<div class="fs-comment"><div class="fs-comment-meta"><strong>${escapeHtml(c.authorName)}</strong> · <span class="fs-comment-time">${escapeHtml(
-            c.createdAt.toISOString(),
-          )}</span></div><div class="fs-comment-body">${escapeHtml(c.body)}</div></div>`,
-      )
+      .map(c => {
+        const isAdmin = c.is_admin_response === true;
+        return `<div class="fs-comment${isAdmin ? ' fs-comment--admin' : ''}">
+          ${isAdmin ? '<div class="fs-comment-admin-badge">Admin Response</div>' : ''}
+          <div class="fs-comment-meta"><strong>${escapeHtml(c.authorName)}</strong> · <span class="fs-comment-time">${escapeHtml(c.createdAt.toISOString())}</span></div>
+          <div class="fs-comment-body">${escapeHtml(c.body)}</div>
+        </div>`;
+      })
       .join('');
 
     const details = s.details?.trim() || 'No additional details provided.';
 
-    const adminSectionHtml =
-      this._user?.role === 'admin'
-        ? `<div class="fs-admin-status">
-            <label for="fs-status-select">Update Status</label>
-            <select id="fs-status-select" aria-label="Update suggestion status">
-              <option value="">No Status</option>
-              ${STATUS_OPTIONS.map(
-                opt =>
-                  `<option value="${opt}"${s.status === opt ? ' selected' : ''}>${opt}</option>`,
-              ).join('')}
-            </select>
-            ${this._statusError ? `<div class="fs-admin-error">${escapeHtml(this._statusError)}</div>` : ''}
-          </div>`
-        : '';
+    const voteSection = isLocked
+      ? `<div class="fs-locked-notice">This suggestion is closed.</div>`
+      : `<button id="fs-upvote-btn" class="fs-btn fs-btn--primary" type="button">↑ ${s.voteCount} votes${this._userVoted ? ' · voted' : ''}</button>`;
+
+    const commentFormHtml = isLocked
+      ? ''
+      : `<form id="fs-comment-form" class="fs-comment-form">
+          <textarea id="fs-comment-body" class="fs-form-input fs-form-textarea" placeholder="Add a comment"></textarea>
+          <div class="fs-form-actions"><button type="submit" class="fs-btn fs-btn--primary">Comment</button></div>
+        </form>`;
 
     container.innerHTML = `
       <div class="fs-dialog-overlay" id="fs-dialog-overlay" role="presentation">
@@ -687,23 +708,18 @@ class FeatureSuggestionsElement extends HTMLElement {
               ${s.status ? `<span class="fs-card-status fs-card-status--${statusToClassName(s.status)}">${escapeHtml(s.status)}</span>` : ''}
             </div>
             <h2 class="fs-dialog-title" id="fs-dialog-title">${escapeHtml(s.title)}</h2>
-            <div class="fs-dialog-byline">by ${escapeHtml(s.authorName)}</div>
+            <div class="fs-dialog-byline">Suggested by ${escapeHtml(s.authorName)}</div>
           </div>
-          ${adminSectionHtml}
           <p class="fs-card-details" id="fs-dialog-details">${escapeHtml(details)}</p>
           <div class="fs-card-meta">
-            <button id="fs-upvote-btn" class="fs-btn fs-btn--primary" type="button">▲ ${s.voteCount}${this._userVoted ? ' (voted)' : ''}</button>
-            <span class="fs-card-comments">💬 ${s.commentCount}</span>
-            <span class="fs-card-author">by ${escapeHtml(s.authorName)}</span>
+            ${voteSection}
+            <span class="fs-card-comments">&#x1F4AC; ${s.commentCount} comments</span>
           </div>
 
           <div class="fs-comments-root">
             <h3>Comments (${this._comments.length})</h3>
             <div class="fs-comments-list">${commentsHtml || '<div class="fs-state">No comments yet.</div>'}</div>
-            <form id="fs-comment-form" class="fs-comment-form">
-              <textarea id="fs-comment-body" class="fs-form-input fs-form-textarea" placeholder="Add a comment"></textarea>
-              <div class="fs-form-actions"><button type="submit" class="fs-btn fs-btn--primary">Comment</button></div>
-            </form>
+            ${commentFormHtml}
           </div>
         </div>
       </div>
@@ -860,33 +876,6 @@ class FeatureSuggestionsElement extends HTMLElement {
       }
       this.renderFeed();
       this.renderDialogRoot();
-    });
-
-    const statusSelect =
-      dialogRoot.querySelector<HTMLSelectElement>('#fs-status-select');
-    statusSelect?.addEventListener('change', async () => {
-      if (!this._adapter || !this._activeSuggestionId) return;
-      const newValue = statusSelect.value;
-      if (!newValue) return; // "No Status" — no-op
-      const newStatus = newValue as SuggestionStatus;
-      const suggestion = this._suggestions.find(
-        s => s.id === this._activeSuggestionId,
-      );
-      if (!suggestion) return;
-      const prevStatus = suggestion.status;
-      statusSelect.disabled = true;
-      this._statusError = null;
-      try {
-        await this._adapter.setStatus(this._activeSuggestionId, newStatus);
-        suggestion.status = newStatus;
-        this.renderFeed();
-        this.renderDialogRoot();
-      } catch {
-        suggestion.status = prevStatus;
-        this._statusError = "Couldn't save status. Try again.";
-        this.renderFeed();
-        this.renderDialogRoot();
-      }
     });
 
     const commentForm =

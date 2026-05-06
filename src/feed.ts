@@ -57,9 +57,9 @@ export function renderSuggestionCard(s: Suggestion): string {
       <h3 class="fs-card-title">${escapeHtml(s.title)}</h3>
       ${s.details ? `<p class="fs-card-details">${escapeHtml(s.details)}</p>` : ''}
       <div class="fs-card-meta">
-        <span class="fs-card-votes">▲ ${s.voteCount}</span>
-        <span class="fs-card-comments">💬 ${s.commentCount}</span>
-        <span class="fs-card-author">by ${escapeHtml(s.authorName)}</span>
+        <span class="fs-card-votes">↑ ${s.voteCount} votes</span>
+        <span class="fs-card-comments">&#x1F4AC; ${s.commentCount} comments</span>
+        <span class="fs-card-author">Suggested by ${escapeHtml(s.authorName)}</span>
       </div>
     </div>
   `;

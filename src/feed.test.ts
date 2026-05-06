@@ -155,8 +155,8 @@ describe('renderSuggestionCard', () => {
     const html = renderSuggestionCard(
       makeSuggestion({ voteCount: 7, commentCount: 3 }),
     );
-    expect(html).toContain('▲ 7');
-    expect(html).toContain('💬 3');
+    expect(html).toContain('↑ 7 votes');
+    expect(html).toContain('3 comments');
   });
 
   it('renders status badge when status is set', () => {
