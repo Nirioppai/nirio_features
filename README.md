@@ -77,20 +77,50 @@ The widget is a custom element. Register it once, then mount and pass the host-a
 ## API
 
 - `defineWidget()` — registers the `<feature-suggestions>` element. Safe to call multiple times.
-- `createFirebaseAdapter(firestore)` — factory returning a `StorageAdapter` backed by Firestore.
-- `createHttpAdapter(config)` — factory returning a `StorageAdapter` backed by a host REST API (cookie-auth friendly). See [Integrating with External Projects](#integrating-with-external-projects).
-- Exported types: `WidgetUser`, `WidgetTheme`, `SortOption`, `HttpAdapterConfig` (and the underlying `Suggestion`, `Comment`, `Vote`, `StorageAdapter` types from `src/`).
+- `createFirebaseAdapter(firestore)` — factory returning a `StorageAdapter` backed by Firestore. **`firebase` is an optional peer dependency** — only install it if you use this adapter.
+- `createHttpAdapter(config)` — factory returning a `StorageAdapter` backed by a host REST API (cookie-auth friendly, no extra deps). See [Integrating with External Projects](#integrating-with-external-projects).
+- Exported types: `WidgetUser`, `WidgetTheme`, `SortOption`, `HttpAdapterConfig`, `FeatureSuggestionsElement` (and the underlying `Suggestion`, `Comment`, `Vote`, `StorageAdapter` types from `src/`).
 
 ### Element properties
 
-| Property  | Type                                    | Notes                                             |
-| --------- | --------------------------------------- | ------------------------------------------------- |
-| `user`    | `{ id, name, email, role }`             | Host app owns auth; widget trusts the value.      |
-| `adapter` | `StorageAdapter`                        | Required; use the Firebase adapter or your own.   |
-| `theme`   | `{ primaryColor?, background?, font? }` | Maps to CSS custom properties on the shadow root. |
-| `logo`    | `string`                                | URL rendered above the intro tagline.             |
+The widget is a typed custom element. After `import` the package augments
+`HTMLElementTagNameMap`, so `document.createElement('feature-suggestions')`
+returns a `FeatureSuggestionsElement` with typed properties — **no `as
+unknown as { ... }` casts required**.
 
-Admin behavior: when `user.role === 'admin'`, the detail dialog exposes a status selector. All users see the resulting status badge on cards and in the dialog.
+| Property  | Type                 | Required | Notes                                                              |
+| --------- | -------------------- | -------- | ------------------------------------------------------------------ |
+| `user`    | `WidgetUser \| null` | yes      | `{ id, name, email, role }`. Host app owns auth; widget trusts it. |
+| `adapter` | `StorageAdapter`     | yes      | One of the bundled adapters or your own `StorageAdapter` impl.     |
+| `theme`   | `WidgetTheme`        | no       | `{ primaryColor?, background?, font? }` → CSS custom properties.   |
+| `logo`    | `string \| null`     | no       | URL rendered above the intro tagline.                              |
+
+```ts
+import {
+  defineWidget,
+  type FeatureSuggestionsElement,
+  type WidgetUser,
+  type StorageAdapter,
+} from '@nirioppai/feature-suggestions';
+
+defineWidget();
+const el = document.createElement('feature-suggestions'); // FeatureSuggestionsElement
+el.user = {
+  id: '1',
+  name: 'A',
+  email: 'a@x',
+  role: 'user',
+} satisfies WidgetUser;
+el.adapter = adapter; // StorageAdapter
+```
+
+### Admin gating
+
+The admin status selector is gated on **exact string equality**:
+`user.role === 'admin'`. Anything else — `'admin_user'`, `'administrator'`,
+`'ADMIN'`, `null`, `undefined` — hides the selector. Map your host app's role
+taxonomy accordingly when constructing `WidgetUser`. All users see the
+resulting status badge regardless of role.
 
 ## Integrating with External Projects
 
@@ -168,11 +198,34 @@ JSON shapes (server returns `snake_case`; the adapter maps to the `camelCase` ty
 
 Behavioral guarantees of the HTTP adapter:
 
-- Every request sets `credentials: 'include'` and `Accept: 'application/json'`.
-- Mutating requests (`POST` / `PATCH` / `PUT` / `DELETE`) URL-decode the `XSRF-TOKEN` cookie and send it as `X-XSRF-TOKEN`. Cookie + header names are configurable (`csrfCookieName`, `csrfHeaderName`); pass `csrfCookieName: null` to disable.
-- `getVote` returns `null` on 404; all other non-2xx responses throw an `Error` whose `.message` is the server's `message` field (or `HTTP {status}`) and whose `.body` is the parsed envelope.
-- `created_at` strings are parsed to `Date`. Field names are mapped `snake_case` → `camelCase`.
-- The `userId` argument on the vote methods is ignored on the wire — the server is expected to derive identity from the session.
+- Every request sets `credentials: 'include'` (configurable via the
+  `credentials` option) and `Accept: 'application/json'`.
+- Mutating requests (`POST` / `PATCH` / `PUT` / `DELETE`) URL-decode the
+  `XSRF-TOKEN` cookie and send it as `X-XSRF-TOKEN`. Cookie + header names
+  are configurable (`csrfCookieName`, `csrfHeaderName`); pass
+  `csrfCookieName: null` to disable. The adapter **does not** call
+  `/sanctum/csrf-cookie` — the host primes the cookie before mounting.
+- `getVote` returns `null` on 404; all other non-2xx responses throw an
+  `Error` whose `.message` is the server's `message` field (or
+  `HTTP {status}`), `.status` is the HTTP status, and `.body` is the parsed
+  envelope.
+- `created_at` ISO strings are parsed to `Date`. Field names are mapped
+  `snake_case` → `camelCase`. Server IDs may be string or number; both are
+  coerced to string in the typed result.
+- The `userId` argument on the vote methods is ignored on the wire — the
+  server is expected to derive identity from the session.
+
+#### `HttpAdapterConfig`
+
+| Option           | Type                 | Default                    | Notes                                                          |
+| ---------------- | -------------------- | -------------------------- | -------------------------------------------------------------- |
+| `baseUrl`        | `string`             | — (required)               | API host, no trailing slash.                                   |
+| `resourcePath`   | `string`             | `/api/feature-suggestions` | Path mounted by the host server.                               |
+| `fetch`          | `typeof fetch`       | `globalThis.fetch`         | Override for tests, SSR, or instrumented transports.           |
+| `fetchImpl`      | `typeof fetch`       | —                          | **Deprecated** alias for `fetch`. Removed in a future major.   |
+| `credentials`    | `RequestCredentials` | `'include'`                | Cookie session needs `'include'`; token auth can use `'omit'`. |
+| `csrfCookieName` | `string \| null`     | `'XSRF-TOKEN'`             | `null` disables the CSRF header entirely.                      |
+| `csrfHeaderName` | `string`             | `'X-XSRF-TOKEN'`           | Whatever your server expects.                                  |
 
 End-to-end example (host owns auth + CSRF, widget renders + persists):
 

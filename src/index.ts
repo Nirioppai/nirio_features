@@ -13,5 +13,5 @@ export type {
   SuggestionType,
   SuggestionStatus,
 } from './types';
-export { defineWidget } from './widget';
+export { defineWidget, FeatureSuggestionsElement } from './widget';
 export type { WidgetUser, WidgetTheme, SortOption } from './widget';

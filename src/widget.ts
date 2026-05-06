@@ -728,3 +728,11 @@ export function defineWidget(): void {
     customElements.define('feature-suggestions', FeatureSuggestionsElement);
   }
 }
+
+export { FeatureSuggestionsElement };
+
+declare global {
+  interface HTMLElementTagNameMap {
+    'feature-suggestions': FeatureSuggestionsElement;
+  }
+}

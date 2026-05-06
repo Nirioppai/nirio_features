@@ -57,7 +57,7 @@ describe('HttpAdapter', () => {
   beforeEach(() => {
     clearCookies();
     fetchImpl = makeFetch(() => makeRes([], {}));
-    adapter = createHttpAdapter({ baseUrl: BASE, fetchImpl });
+    adapter = createHttpAdapter({ baseUrl: BASE, fetch: fetchImpl });
   });
 
   afterEach(() => {
@@ -214,7 +214,7 @@ describe('HttpAdapter', () => {
       setCookie('XSRF-TOKEN=abc');
       const a = createHttpAdapter({
         baseUrl: BASE,
-        fetchImpl,
+        fetch: fetchImpl,
         csrfCookieName: null,
       });
       fetchImpl.mockResolvedValueOnce(
@@ -457,7 +457,7 @@ describe('HttpAdapter', () => {
       const a = createHttpAdapter({
         baseUrl: `${BASE}/`,
         resourcePath: '/api/feature-suggestions/',
-        fetchImpl,
+        fetch: fetchImpl,
       });
       fetchImpl.mockResolvedValueOnce(makeRes([]));
       await a.getSuggestions();
@@ -472,13 +472,33 @@ describe('HttpAdapter', () => {
         resourcePath: '/v2/ideas',
         csrfCookieName: 'CSRF-TOKEN',
         csrfHeaderName: 'X-Csrf',
-        fetchImpl,
+        fetch: fetchImpl,
       });
       fetchImpl.mockResolvedValueOnce(makeRes(null, { status: 204 }));
       await a.setStatus('9', 'Planned');
       const [url, init] = fetchImpl.mock.calls[0]!;
       expect(url).toBe(`${BASE}/v2/ideas/9/status`);
       expect((init.headers as Record<string, string>)['X-Csrf']).toBe('t');
+    });
+
+    it('still accepts the deprecated `fetchImpl` alias', async () => {
+      // Back-compat: pre-1.1 release-candidate field name.
+      const a = createHttpAdapter({ baseUrl: BASE, fetchImpl });
+      fetchImpl.mockResolvedValueOnce(makeRes([]));
+      await a.getSuggestions();
+      expect(fetchImpl).toHaveBeenCalledTimes(1);
+    });
+
+    it('honors a custom `credentials` mode', async () => {
+      const a = createHttpAdapter({
+        baseUrl: BASE,
+        fetch: fetchImpl,
+        credentials: 'same-origin',
+      });
+      fetchImpl.mockResolvedValueOnce(makeRes([]));
+      await a.getSuggestions();
+      const [, init] = fetchImpl.mock.calls[0]!;
+      expect(init.credentials).toBe('same-origin');
     });
   });
 });

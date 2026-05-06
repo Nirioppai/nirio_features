@@ -15,17 +15,28 @@ export interface HttpAdapterConfig {
   /** Path prefix for the resource. Default: '/api/feature-suggestions'. */
   resourcePath?: string;
   /**
-   * Optional fetch override (for testing / custom transports).
-   * Defaults to globalThis.fetch.
+   * Optional fetch override (for testing / SSR / custom transports).
+   * Defaults to `globalThis.fetch`.
+   */
+  fetch?: typeof fetch;
+  /**
+   * @deprecated Use `fetch` instead. Kept for back-compat with pre-1.1
+   * release candidates; will be removed in a future major.
    */
   fetchImpl?: typeof fetch;
   /**
-   * Name of the CSRF cookie. Default: 'XSRF-TOKEN'.
-   * If null, CSRF header is not sent.
+   * Credentials mode for every request. Default: `'include'` (so cookie
+   * sessions like Laravel Sanctum work). Set to `'same-origin'` or
+   * `'omit'` if your auth model needs it.
+   */
+  credentials?: RequestCredentials;
+  /**
+   * Name of the CSRF cookie. Default: `'XSRF-TOKEN'`.
+   * Set to `null` to disable CSRF header forwarding.
    */
   csrfCookieName?: string | null;
   /**
-   * Header name for the CSRF token. Default: 'X-XSRF-TOKEN'.
+   * Header name for the CSRF token. Default: `'X-XSRF-TOKEN'`.
    */
   csrfHeaderName?: string;
 }
@@ -82,6 +93,7 @@ class HttpAdapter implements StorageAdapter {
   private baseUrl: string;
   private resourcePath: string;
   private fetchImpl: typeof fetch;
+  private credentials: RequestCredentials;
   private csrfCookieName: string | null;
   private csrfHeaderName: string;
 
@@ -93,7 +105,10 @@ class HttpAdapter implements StorageAdapter {
     }
     this.resourcePath = this.resourcePath.replace(/\/+$/, '');
     this.fetchImpl =
-      config.fetchImpl ?? ((...args) => globalThis.fetch(...args));
+      config.fetch ??
+      config.fetchImpl ??
+      ((...args) => globalThis.fetch(...args));
+    this.credentials = config.credentials ?? 'include';
     this.csrfCookieName =
       config.csrfCookieName === undefined
         ? 'XSRF-TOKEN'
@@ -217,7 +232,7 @@ class HttpAdapter implements StorageAdapter {
     const init: RequestInit = {
       method,
       headers,
-      credentials: 'include',
+      credentials: this.credentials,
     };
     if (serializedBody !== undefined) {
       init.body = serializedBody;
