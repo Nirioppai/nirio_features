@@ -56,4 +56,6 @@ export interface WidgetLayout {
   maxFeedWidth?: number;
   mobileBreakpoint?: number;
   mobileDialogStyle?: 'center' | 'fullscreen';
+  title?: string;
+  subtitle?: string;
 }

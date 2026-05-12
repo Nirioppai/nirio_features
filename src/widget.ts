@@ -581,6 +581,127 @@ class FeatureSuggestionsElement extends HTMLElement {
           color: #fff;
           border-color: var(--fs-primary-color);
         }
+        .fs-pill-count {
+          margin-left: 4px;
+          opacity: 0.75;
+        }
+        /* result count */
+        .fs-result-count {
+          font-size: 0.8rem;
+          color: var(--fs-text-muted);
+          white-space: nowrap;
+        }
+        /* sort button dual labels */
+        .fs-mobile-label { display: none; }
+        .fs-desktop-label { display: inline; }
+        /* card layout — desktop: row with vote-box on left */
+        .fs-card {
+          display: flex;
+          align-items: flex-start;
+          gap: var(--fs-space-3);
+        }
+        .fs-vote-box {
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+          gap: 2px;
+          min-width: 44px;
+          padding: var(--fs-space-2) var(--fs-space-1);
+          border: 1px solid var(--fs-border-strong);
+          border-radius: var(--fs-radius-sm);
+          background: var(--fs-surface-muted);
+          color: var(--fs-text-muted);
+          font-size: 0.8rem;
+          cursor: pointer;
+          font-family: inherit;
+          flex-shrink: 0;
+        }
+        .fs-vote-box:hover {
+          border-color: var(--fs-border-focus);
+          color: var(--fs-primary-color);
+        }
+        .fs-vote-box[aria-pressed="true"] {
+          border-color: var(--fs-primary-color);
+          background: var(--fs-primary-color);
+          color: #fff;
+        }
+        .fs-vote-arrow { font-size: 0.9rem; line-height: 1; }
+        .fs-vote-count { font-weight: 600; }
+        .fs-card-body { flex: 1; min-width: 0; }
+        .fs-card-top {
+          display: flex;
+          gap: var(--fs-space-2);
+          flex-wrap: wrap;
+          margin-bottom: var(--fs-space-2);
+          align-items: center;
+        }
+        /* desktop status badge (right side sibling) */
+        .fs-card-status--desktop { flex-shrink: 0; align-self: flex-start; }
+        /* mobile status badge (inside card-top) — hidden on desktop */
+        .fs-card-status--mobile { display: none; }
+        /* mobile vote pill (inside card-meta) — hidden on desktop */
+        .fs-vote-pill {
+          display: none;
+          align-items: center;
+          gap: 4px;
+          padding: 2px 10px;
+          border: 1px solid var(--fs-border-strong);
+          border-radius: 999px;
+          background: var(--fs-surface-muted);
+          color: var(--fs-text-muted);
+          font-size: 0.8rem;
+          cursor: pointer;
+          font-family: inherit;
+        }
+        .fs-vote-pill[aria-pressed="true"] {
+          background: var(--fs-primary-color);
+          border-color: var(--fs-primary-color);
+          color: #fff;
+        }
+        /* toolbar (bare mode) */
+        .fs-toolbar {
+          display: flex;
+          justify-content: space-between;
+          align-items: flex-start;
+          gap: var(--fs-space-4);
+          margin-bottom: var(--fs-space-5);
+        }
+        .fs-toolbar-left { display: flex; flex-direction: column; gap: var(--fs-space-1); }
+        .fs-toolbar-title {
+          margin: 0;
+          font-size: 1.25rem;
+          font-weight: 700;
+          color: var(--fs-text-color);
+          line-height: 1.2;
+        }
+        .fs-toolbar-subtitle {
+          margin: 0;
+          font-size: var(--fs-font-size-base);
+          color: var(--fs-text-muted);
+        }
+        .fs-toolbar-right { flex-shrink: 0; }
+        /* mobile FAB */
+        .fs-fab-mobile {
+          position: fixed;
+          bottom: 24px;
+          right: 24px;
+          width: 52px;
+          height: 52px;
+          border-radius: 50%;
+          background: var(--fs-primary-color);
+          color: #fff;
+          border: none;
+          font-size: 1.5rem;
+          line-height: 1;
+          cursor: pointer;
+          display: none;
+          align-items: center;
+          justify-content: center;
+          box-shadow: 0 4px 12px rgba(0,0,0,0.25);
+          z-index: 50;
+          font-family: inherit;
+        }
         @media (max-width: ${this._layout.mobileBreakpoint ?? 640}px) {
           .fs-dialog-overlay {
             padding: 0;
@@ -592,16 +713,55 @@ class FeatureSuggestionsElement extends HTMLElement {
             border-bottom-left-radius: ${(this._layout.mobileDialogStyle ?? 'fullscreen') === 'center' ? 'var(--fs-radius-lg)' : '0'};
             border-bottom-right-radius: ${(this._layout.mobileDialogStyle ?? 'fullscreen') === 'center' ? 'var(--fs-radius-lg)' : '0'};
           }
+          /* search above filters on mobile */
+          .fs-feed { display: flex; flex-direction: column; }
+          .fs-filter-pills { order: 1; }
+          .fs-controls { order: 0; }
+          /* mobile card: column layout */
+          .fs-card { flex-direction: column; gap: var(--fs-space-2); }
+          .fs-vote-box { display: none; }
+          .fs-card-status--mobile { display: inline-flex; }
+          .fs-card-status--desktop { display: none; }
+          .fs-vote-pill { display: inline-flex; }
+          /* sort labels */
+          .fs-desktop-label { display: none; }
+          .fs-mobile-label { display: inline; }
+          /* toolbar compact button */
+          .fs-toolbar-right .fs-btn--primary {
+            width: 44px;
+            height: 44px;
+            padding: 0;
+            border-radius: var(--fs-radius-sm);
+            font-size: 1.25rem;
+            line-height: 1;
+            overflow: hidden;
+            text-indent: -9999px;
+          }
+          .fs-toolbar-right .fs-btn--primary::after {
+            content: '+';
+            display: block;
+            text-indent: 0;
+            font-size: 1.5rem;
+            line-height: 1;
+          }
+          .fs-fab-mobile { display: flex; }
         }
       </style>
       <div class="fs-shell${this._layout.bare ? ' fs-shell--bare' : ''}">
         ${
           this._layout.bare
-            ? `<div class="fs-bare-bar">
-          <button id="fs-new-btn" class="fs-btn fs-btn--primary">+ New Suggestion</button>
-        </div>`
+            ? `<div class="fs-toolbar">
+          <div class="fs-toolbar-left">
+            <h1 class="fs-toolbar-title">${escapeHtml(this._layout.title ?? 'Feature Suggestions')}</h1>
+            <p class="fs-toolbar-subtitle">${escapeHtml(this._layout.subtitle ?? 'Vote, comment, and submit ideas to shape what ships next.')}</p>
+          </div>
+          <div class="fs-toolbar-right">
+            <button id="fs-new-btn" class="fs-btn fs-btn--primary">+ New Suggestion</button>
+          </div>
+        </div>
+        <button class="fs-fab-mobile" id="fs-fab-mobile" aria-label="New suggestion">+</button>`
             : `<div class="fs-header">
-          ${this._logo ? `<img class="fs-logo" src="${this._logo}" alt="Logo" />` : ''}
+          ${this._logo ? `<img class="fs-logo" src="${escapeHtml(this._logo)}" alt="Logo" />` : ''}
           <p class="fs-tagline">Let us know how we can improve...</p>
           <button id="fs-new-btn" class="fs-btn fs-btn--primary">+ New Suggestion</button>
         </div>`
@@ -914,7 +1074,7 @@ class FeatureSuggestionsElement extends HTMLElement {
   }
 
   private bindShellEvents(): void {
-    this._root.getElementById('fs-new-btn')?.addEventListener('click', () => {
+    const openForm = () => {
       const formMode = this._layout.formMode ?? 'modal';
       if (formMode === 'inline') {
         this._showForm = true;
@@ -926,13 +1086,12 @@ class FeatureSuggestionsElement extends HTMLElement {
         };
         this.renderFormSection();
       } else {
-        // Modal mode: emit composed event so host can intercept and use its own dialog
         const event = new CustomEvent('fs:open-form', {
           bubbles: true,
           composed: true,
           cancelable: true,
         });
-        if (!this.dispatchEvent(event)) return; // host handles the dialog
+        if (!this.dispatchEvent(event)) return;
         this._dialogMode = 'form';
         this._formState = {
           title: '',
@@ -942,7 +1101,14 @@ class FeatureSuggestionsElement extends HTMLElement {
         };
         this.renderDialogRoot();
       }
-    });
+    };
+
+    this._root
+      .getElementById('fs-new-btn')
+      ?.addEventListener('click', openForm);
+    this._root
+      .getElementById('fs-fab-mobile')
+      ?.addEventListener('click', openForm);
   }
 
   private bindFeedEvents(): void {
