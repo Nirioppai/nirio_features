@@ -7,7 +7,7 @@ import type {
   CreateSuggestionInput,
   WidgetLayout,
 } from './types';
-import { renderFeedHTML, type SortOption } from './feed';
+import { renderFeedHTML, relativeTime, type SortOption } from './feed';
 import { statusToClassName, typeToClassName } from './status';
 import {
   renderSubmissionFormHTML,
@@ -60,6 +60,7 @@ class FeatureSuggestionsElement extends HTMLElement {
   private _activeSuggestionId: string | null = null;
   private _comments: Comment[] = [];
   private _userVoted = false;
+  private _votedIds = new Set<string>();
   private _statusError: string | null = null;
   private _root: ShadowRoot;
   private _colorSchemeMedia: MediaQueryList | null = null;
@@ -214,6 +215,11 @@ class FeatureSuggestionsElement extends HTMLElement {
     this.renderFeed();
     try {
       this._suggestions = await this._adapter.getSuggestions();
+      // Seed voted state from server-provided userVoted field so the feed
+      // shows the correct upvote highlight without extra per-card requests.
+      for (const s of this._suggestions) {
+        if (s.userVoted) this._votedIds.add(s.id);
+      }
     } finally {
       this._loading = false;
       this.renderFeed();
@@ -287,6 +293,8 @@ class FeatureSuggestionsElement extends HTMLElement {
           --fs-font-mono: ui-monospace, SFMono-Regular, monospace;
           --fs-font-size-base: 0.875rem;
           --fs-font-size-heading: 1.125rem;
+          /* host nav inset: host app sets this to clear a fixed bottom bar */
+          --fs-bottom-inset: 0px;
         }
         :host([data-color-scheme="dark"]) {
           --fs-background: #1e1e2e;
@@ -418,6 +426,15 @@ class FeatureSuggestionsElement extends HTMLElement {
           background: var(--fs-surface); border: 1px solid var(--fs-border); border-radius: var(--fs-radius-md);
           padding: var(--fs-space-5); margin-bottom: var(--fs-space-6);
         }
+        /* When the form is rendered inside a dialog, strip the card chrome
+           so it doesn't look like a card nested inside another card. */
+        .fs-dialog .fs-form {
+          background: transparent;
+          border: none;
+          border-radius: 0;
+          padding: 0;
+          margin: 0;
+        }
         .fs-form-title { margin: 0 0 var(--fs-space-4); font-size: 1rem; font-weight: 600; }
         .fs-form-error {
           color: var(--fs-error-color); background: var(--fs-error-bg); border: 1px solid var(--fs-error-border);
@@ -444,7 +461,8 @@ class FeatureSuggestionsElement extends HTMLElement {
           justify-content: center;
           padding: var(--fs-space-4);
           background: var(--fs-backdrop);
-          z-index: 100;
+          /* Must be above the host app's bottom nav bar (MUI zIndex.appBar = 1100) */
+          z-index: 1200;
         }
         .fs-dialog {
           width: 100%;
@@ -702,14 +720,128 @@ class FeatureSuggestionsElement extends HTMLElement {
           z-index: 50;
           font-family: inherit;
         }
+        /* ── form redesign ── */
+        .fs-type-toggle {
+          display: flex;
+          gap: var(--fs-space-2);
+          flex-wrap: wrap;
+        }
+        .fs-type-btn {
+          padding: 6px 14px;
+          border: 1px solid var(--fs-border-strong);
+          border-radius: 999px;
+          background: var(--fs-surface);
+          color: var(--fs-text-muted);
+          font-size: var(--fs-font-size-base);
+          cursor: pointer;
+          font-family: inherit;
+          white-space: nowrap;
+        }
+        .fs-type-btn:hover { border-color: var(--fs-border-focus); color: var(--fs-text-color); }
+        .fs-type-btn--active {
+          background: var(--fs-primary-color);
+          color: #fff;
+          border-color: var(--fs-primary-color);
+        }
+        .fs-form-label--section {
+          font-size: 0.7rem;
+          font-weight: 600;
+          letter-spacing: 0.06em;
+          text-transform: uppercase;
+          color: var(--fs-text-muted);
+        }
+        .fs-required { color: var(--fs-error-color); margin-left: 2px; }
+        .fs-form-hint {
+          font-size: 0.75rem;
+          color: var(--fs-text-muted);
+        }
+        .fs-form-footer {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: var(--fs-space-3);
+          margin-top: var(--fs-space-4);
+          padding-top: var(--fs-space-4);
+          border-top: 1px solid var(--fs-border);
+          flex-wrap: wrap;
+        }
+        .fs-form-posting-as {
+          font-size: var(--fs-font-size-base);
+          color: var(--fs-text-muted);
+        }
+        .fs-form-footer .fs-form-actions {
+          display: flex;
+          gap: var(--fs-space-2);
+          margin-top: 0;
+        }
+        /* ── detail dialog redesign ── */
+        .fs-dialog-topbar {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: var(--fs-space-2);
+        }
+        .fs-dialog-hero {
+          display: flex;
+          align-items: flex-start;
+          gap: var(--fs-space-4);
+        }
+        .fs-dialog-title-group {
+          display: flex;
+          flex-direction: column;
+          gap: 4px;
+          flex: 1;
+          min-width: 0;
+        }
+        .fs-dialog-hero .fs-vote-box {
+          margin-top: 2px;
+          flex-shrink: 0;
+        }
+        /* ── comment avatars ── */
+        .fs-avatar {
+          width: 32px;
+          height: 32px;
+          border-radius: 50%;
+          background: var(--fs-primary-color);
+          color: #fff;
+          font-size: 0.75rem;
+          font-weight: 600;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          flex-shrink: 0;
+          text-transform: uppercase;
+        }
+        .fs-comment-header {
+          display: flex;
+          align-items: center;
+          gap: var(--fs-space-2);
+          margin-bottom: 4px;
+        }
+        .fs-comment-input-row {
+          display: flex;
+          align-items: flex-start;
+          gap: var(--fs-space-2);
+        }
+        .fs-comment-input-row .fs-comment-form {
+          flex: 1;
+        }
+        .fs-comments-heading {
+          margin: 0 0 var(--fs-space-3);
+          font-size: var(--fs-font-size-base);
+          font-weight: 600;
+          color: var(--fs-text-color);
+        }
         @media (max-width: ${this._layout.mobileBreakpoint ?? 640}px) {
           .fs-dialog-overlay {
             padding: 0;
+            /* lift the overlay above the host's bottom nav bar */
+            padding-bottom: var(--fs-bottom-inset);
             align-items: ${(this._layout.mobileDialogStyle ?? 'fullscreen') === 'center' ? 'center' : 'flex-end'};
           }
           .fs-dialog {
             max-width: 100%;
-            max-height: ${(this._layout.mobileDialogStyle ?? 'fullscreen') === 'center' ? '80vh' : '90vh'};
+            max-height: ${(this._layout.mobileDialogStyle ?? 'fullscreen') === 'center' ? 'calc(80dvh - var(--fs-bottom-inset))' : 'calc(90dvh - var(--fs-bottom-inset))'};
             border-bottom-left-radius: ${(this._layout.mobileDialogStyle ?? 'fullscreen') === 'center' ? 'var(--fs-radius-lg)' : '0'};
             border-bottom-right-radius: ${(this._layout.mobileDialogStyle ?? 'fullscreen') === 'center' ? 'var(--fs-radius-lg)' : '0'};
           }
@@ -750,7 +882,7 @@ class FeatureSuggestionsElement extends HTMLElement {
       <div class="fs-shell${this._layout.bare ? ' fs-shell--bare' : ''}">
         ${
           this._layout.bare
-            ? `<div class="fs-toolbar">
+            ? `<div class="fs-bare-bar">
           <div class="fs-toolbar-left">
             <h1 class="fs-toolbar-title">${escapeHtml(this._layout.title ?? 'Feature Suggestions')}</h1>
             <p class="fs-toolbar-subtitle">${escapeHtml(this._layout.subtitle ?? 'Vote, comment, and submit ideas to shape what ships next.')}</p>
@@ -787,6 +919,7 @@ class FeatureSuggestionsElement extends HTMLElement {
       this._layout.filterStyle ?? 'pill-row',
       this._filterStatus,
       this._filterType,
+      this._votedIds,
     );
     this.bindFeedEvents();
   }
@@ -820,29 +953,54 @@ class FeatureSuggestionsElement extends HTMLElement {
 
     const isLocked = s.status === 'Completed' || s.status === 'Declined';
 
+    const getInitials = (name: string) =>
+      name
+        .split(' ')
+        .slice(0, 2)
+        .map(p => p[0] ?? '')
+        .join('')
+        .toUpperCase();
+
     const commentsHtml = this._comments
       .map(c => {
         const isAdmin = c.is_admin_response === true;
+        const initials = getInitials(c.authorName);
+        const timeStr = relativeTime(c.createdAt);
         return `<div class="fs-comment${isAdmin ? ' fs-comment--admin' : ''}">
           ${isAdmin ? '<div class="fs-comment-admin-badge">Admin Response</div>' : ''}
-          <div class="fs-comment-meta"><strong>${escapeHtml(c.authorName)}</strong> · <span class="fs-comment-time">${escapeHtml(c.createdAt.toISOString())}</span></div>
+          <div class="fs-comment-header">
+            <div class="fs-avatar">${escapeHtml(initials)}</div>
+            <div class="fs-comment-meta"><strong>${escapeHtml(c.authorName)}</strong> <span class="fs-comment-time">· ${escapeHtml(timeStr)}</span></div>
+          </div>
           <div class="fs-comment-body">${escapeHtml(c.body)}</div>
         </div>`;
       })
       .join('');
 
-    const details = s.details?.trim() || 'No additional details provided.';
+    const details = s.details?.trim();
 
-    const voteSection = isLocked
+    const voteBoxHtml = isLocked
       ? `<div class="fs-locked-notice">This suggestion is closed.</div>`
-      : `<button id="fs-upvote-btn" class="fs-btn fs-btn--primary" type="button">↑ ${s.voteCount} votes${this._userVoted ? ' · voted' : ''}</button>`;
+      : `<button id="fs-upvote-btn" class="fs-vote-box${this._userVoted ? ' fs-vote-box--active' : ''}" type="button" aria-pressed="${this._userVoted}" aria-label="Upvote">
+          <span class="fs-vote-arrow">▲</span>
+          <span class="fs-vote-count">${s.voteCount}</span>
+        </button>`;
+
+    const userInitials = this._user ? getInitials(this._user.name) : 'A';
 
     const commentFormHtml = isLocked
       ? ''
-      : `<form id="fs-comment-form" class="fs-comment-form">
-          <textarea id="fs-comment-body" class="fs-form-input fs-form-textarea" placeholder="Add a comment"></textarea>
-          <div class="fs-form-actions"><button type="submit" class="fs-btn fs-btn--primary">Comment</button></div>
-        </form>`;
+      : `<div class="fs-comment-input-row">
+          <div class="fs-avatar">${escapeHtml(userInitials)}</div>
+          <form id="fs-comment-form" class="fs-comment-form">
+            <textarea id="fs-comment-body" class="fs-form-input fs-form-textarea" placeholder="Add a comment..." rows="3"></textarea>
+            <div class="fs-form-actions">
+              <button type="submit" class="fs-btn fs-btn--primary">Comment</button>
+            </div>
+          </form>
+        </div>`;
+
+    const byline = `Suggested by ${escapeHtml(s.authorName)} · ${relativeTime(s.createdAt)} · ${s.commentCount} comment${s.commentCount !== 1 ? 's' : ''}`;
 
     container.innerHTML = `
       <div class="fs-dialog-overlay" id="fs-dialog-overlay" role="presentation">
@@ -851,33 +1009,31 @@ class FeatureSuggestionsElement extends HTMLElement {
           role="dialog"
           aria-modal="true"
           aria-labelledby="fs-dialog-title"
-          aria-describedby="fs-dialog-details"
           tabindex="-1"
         >
-          <button
-            id="fs-dialog-close"
-            class="fs-dialog-close"
-            type="button"
-            aria-label="Close dialog"
-          >
-            ✕
-          </button>
-          <div class="fs-dialog-header">
+          <div class="fs-dialog-topbar">
             <div class="fs-dialog-badges">
               <span class="fs-card-type fs-card-type--${typeToClassName(s.type)}">${escapeHtml(s.type)}</span>
-              ${s.status ? `<span class="fs-card-status fs-card-status--${statusToClassName(s.status)}">${escapeHtml(s.status)}</span>` : ''}
+              ${s.status ? `<span class="fs-card-status fs-card-status--${statusToClassName(s.status)}">● ${escapeHtml(s.status)}</span>` : ''}
             </div>
-            <h2 class="fs-dialog-title" id="fs-dialog-title">${escapeHtml(s.title)}</h2>
-            <div class="fs-dialog-byline">Suggested by ${escapeHtml(s.authorName)}</div>
+            <button
+              id="fs-dialog-close"
+              class="fs-dialog-close"
+              type="button"
+              aria-label="Close dialog"
+            >✕</button>
           </div>
-          <p class="fs-card-details" id="fs-dialog-details">${escapeHtml(details)}</p>
-          <div class="fs-card-meta">
-            ${voteSection}
-            <span class="fs-card-comments">&#x1F4AC; ${s.commentCount} comments</span>
+          <div class="fs-dialog-hero">
+            ${voteBoxHtml}
+            <div class="fs-dialog-title-group">
+              <h2 class="fs-dialog-title" id="fs-dialog-title">${escapeHtml(s.title)}</h2>
+              <div class="fs-dialog-byline">${byline}</div>
+            </div>
           </div>
+          ${details ? `<p class="fs-card-details" id="fs-dialog-details">${escapeHtml(details)}</p>` : ''}
 
           <div class="fs-comments-root">
-            <h3>Comments (${this._comments.length})</h3>
+            <h3 class="fs-comments-heading">Comments · ${this._comments.length}</h3>
             <div class="fs-comments-list">${commentsHtml || '<div class="fs-state">No comments yet.</div>'}</div>
             ${commentFormHtml}
           </div>
@@ -920,6 +1076,7 @@ class FeatureSuggestionsElement extends HTMLElement {
         details: '',
         type: 'New Feature',
         error: null,
+        userName: this._user?.name,
       };
       this.renderDialogRoot();
     };
@@ -958,10 +1115,11 @@ class FeatureSuggestionsElement extends HTMLElement {
     this._activeSuggestionId = suggestionId;
     this._dialogMode = 'detail';
     this._comments = [];
-    this._userVoted = false;
+    // Use local voted cache so the dialog opens with correct state immediately
+    this._userVoted = this._votedIds.has(suggestionId);
     this._statusError = null;
 
-    // Render immediately with optimistic unvoted state (no 404 blocks the dialog open)
+    // Render immediately with optimistic voted state from local cache
     this.renderDialogRoot();
 
     // Fetch comments and vote state in parallel
@@ -975,6 +1133,9 @@ class FeatureSuggestionsElement extends HTMLElement {
       this._comments = comments;
       // getVote returns null on 404 (no vote) — treated as unvoted, no error
       this._userVoted = vote !== null;
+      // Keep local cache in sync with server truth
+      if (this._userVoted) this._votedIds.add(suggestionId);
+      else this._votedIds.delete(suggestionId);
     } catch {
       this._comments = [];
       this._userVoted = false;
@@ -1029,10 +1190,12 @@ class FeatureSuggestionsElement extends HTMLElement {
         await this._adapter.removeVote(id, this._user.id);
         suggestion.voteCount = Math.max(0, suggestion.voteCount - 1);
         this._userVoted = false;
+        this._votedIds.delete(id);
       } else {
         await this._adapter.addVote(id, this._user.id);
         suggestion.voteCount = suggestion.voteCount + 1;
         this._userVoted = true;
+        this._votedIds.add(id);
       }
       this.renderFeed();
       this.renderDialogRoot();
@@ -1083,6 +1246,7 @@ class FeatureSuggestionsElement extends HTMLElement {
           details: '',
           type: 'New Feature',
           error: null,
+          userName: this._user?.name,
         };
         this.renderFormSection();
       } else {
@@ -1098,6 +1262,7 @@ class FeatureSuggestionsElement extends HTMLElement {
           details: '',
           type: 'New Feature',
           error: null,
+          userName: this._user?.name,
         };
         this.renderDialogRoot();
       }
@@ -1156,6 +1321,30 @@ class FeatureSuggestionsElement extends HTMLElement {
         });
       });
 
+    // vote on card — stop propagation so the card-open handler never fires
+    this._root
+      .querySelectorAll<HTMLButtonElement>('[data-vote-id]')
+      .forEach(btn => {
+        btn.addEventListener('click', async e => {
+          e.stopPropagation();
+          if (!this._adapter || !this._user) return;
+          const id = btn.dataset['voteId'];
+          if (!id) return;
+          const suggestion = this._suggestions.find(s => s.id === id);
+          if (!suggestion) return;
+          if (this._votedIds.has(id)) {
+            await this._adapter.removeVote(id, this._user.id);
+            suggestion.voteCount = Math.max(0, suggestion.voteCount - 1);
+            this._votedIds.delete(id);
+          } else {
+            await this._adapter.addVote(id, this._user.id);
+            suggestion.voteCount = suggestion.voteCount + 1;
+            this._votedIds.add(id);
+          }
+          this.renderFeed();
+        });
+      });
+
     // open detail on card click / keyboard
     this._root.querySelectorAll<HTMLElement>('.fs-card').forEach(card => {
       card.addEventListener('click', () => {
@@ -1176,20 +1365,32 @@ class FeatureSuggestionsElement extends HTMLElement {
     const form = this._root.querySelector<HTMLFormElement>('.fs-form');
     if (!form) return;
 
+    // Type toggle buttons (replacing select)
+    form.querySelectorAll<HTMLButtonElement>('[data-type]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const type = btn.dataset['type'] as SuggestionType;
+        this._formState = { ...this._formState, type };
+        form.querySelectorAll<HTMLButtonElement>('[data-type]').forEach(b => {
+          const isActive = b.dataset['type'] === type;
+          b.classList.toggle('fs-type-btn--active', isActive);
+          b.setAttribute('aria-pressed', String(isActive));
+        });
+      });
+    });
+
     form.addEventListener('submit', e => {
       e.preventDefault();
       const titleInput = form.querySelector<HTMLInputElement>('#fs-title');
       const detailsInput =
         form.querySelector<HTMLTextAreaElement>('#fs-details');
-      const typeSelect = form.querySelector<HTMLSelectElement>('#fs-type');
 
       const title = titleInput?.value ?? '';
       const details = detailsInput?.value ?? '';
-      const type = (typeSelect?.value ?? 'New Feature') as SuggestionType;
+      const type = this._formState.type;
 
       const error = validateTitle(title);
       if (error) {
-        this._formState = { title, details, type, error };
+        this._formState = { ...this._formState, title, details, type, error };
         if (this._dialogMode === 'form') {
           this.renderDialogRoot();
         } else {
@@ -1208,6 +1409,7 @@ class FeatureSuggestionsElement extends HTMLElement {
         details: '',
         type: 'New Feature',
         error: null,
+        userName: this._user?.name,
       };
       if (this._dialogMode === 'form') {
         this._dialogMode = 'none';
@@ -1245,6 +1447,7 @@ class FeatureSuggestionsElement extends HTMLElement {
       details: '',
       type: 'New Feature',
       error: null,
+      userName: this._user?.name,
     };
     this.renderFeed();
     this.renderFormSection();
@@ -1259,6 +1462,7 @@ class FeatureSuggestionsElement extends HTMLElement {
       details: '',
       type: 'New Feature',
       error: null,
+      userName: this._user?.name,
     };
     this.renderFormSection();
     this.renderDialogRoot();

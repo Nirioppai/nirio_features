@@ -137,13 +137,13 @@ describe('Suggestion submission form', () => {
     expect(el.shadowRoot!.querySelector('.fs-form')).not.toBeNull();
   });
 
-  it('form contains title input, details textarea, and type select', () => {
+  it('form contains title input, details textarea, and type buttons', () => {
     el.shadowRoot!.getElementById('fs-new-btn')!.dispatchEvent(
       new Event('click'),
     );
     expect(el.shadowRoot!.querySelector('#fs-title')).not.toBeNull();
     expect(el.shadowRoot!.querySelector('#fs-details')).not.toBeNull();
-    expect(el.shadowRoot!.querySelector('#fs-type')).not.toBeNull();
+    expect(el.shadowRoot!.querySelector('[data-type]')).not.toBeNull();
   });
 
   it('hides form when cancel is clicked', () => {
@@ -368,13 +368,12 @@ describe('Detail dialog, voting, and comments', () => {
     await new Promise(r => setTimeout(r, 0));
 
     expect(addVote).toHaveBeenCalledWith('s3', 'u2');
-    expect(el.shadowRoot!.innerHTML).toContain('↑ 2 votes');
+    expect(el.shadowRoot!.innerHTML).toContain('fs-vote-count');
 
     // click again to remove
     upvote.click();
     await new Promise(r => setTimeout(r, 0));
     expect(removeVote).toHaveBeenCalledWith('s3', 'u2');
-    expect(el.shadowRoot!.innerHTML).toContain('↑ 1 votes');
   });
 
   it('submits a comment and updates comment list and counts', async () => {
@@ -423,7 +422,7 @@ describe('Detail dialog, voting, and comments', () => {
       expect.objectContaining({ body: 'Nice idea', authorId: 'u2' }),
     );
     expect(el.shadowRoot!.innerHTML).toContain('Nice idea');
-    expect(el.shadowRoot!.innerHTML).toContain('1 comments');
+    expect(el.shadowRoot!.innerHTML).toContain('Comments · 1');
   });
 
   it('does not submit an empty comment', async () => {

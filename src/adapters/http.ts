@@ -52,6 +52,7 @@ interface ServerSuggestion {
   vote_count: number;
   comment_count: number;
   created_at: string;
+  user_voted?: boolean;
 }
 
 interface ServerComment {
@@ -301,6 +302,7 @@ function toSuggestion(s: ServerSuggestion): Suggestion {
   };
   if (s.details != null) out.details = s.details;
   if (s.status != null) out.status = s.status;
+  if (s.user_voted != null) out.userVoted = s.user_voted;
   return out;
 }
 

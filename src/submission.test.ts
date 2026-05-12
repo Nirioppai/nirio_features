@@ -10,11 +10,11 @@ const base: SubmissionFormState = {
 };
 
 describe('renderSubmissionFormHTML', () => {
-  it('renders title input, details textarea, and type select', () => {
+  it('renders title input, details textarea, and type buttons', () => {
     const html = renderSubmissionFormHTML(base);
     expect(html).toContain('id="fs-title"');
     expect(html).toContain('id="fs-details"');
-    expect(html).toContain('id="fs-type"');
+    expect(html).toContain('data-type="New Feature"');
   });
 
   it('renders submit and cancel buttons', () => {
@@ -30,13 +30,17 @@ describe('renderSubmissionFormHTML', () => {
     expect(html).toContain('Bug Report');
   });
 
-  it('marks the current type as selected', () => {
+  it('marks the current type as active', () => {
     const html = renderSubmissionFormHTML({ ...base, type: 'Bug Report' });
-    expect(html).toContain('<option value="Bug Report" selected>Bug Report</option>');
+    expect(html).toContain('data-type="Bug Report"');
+    expect(html).toContain('fs-type-btn--active');
   });
 
   it('renders error message with role="alert" when error is set', () => {
-    const html = renderSubmissionFormHTML({ ...base, error: 'Title is required.' });
+    const html = renderSubmissionFormHTML({
+      ...base,
+      error: 'Title is required.',
+    });
     expect(html).toContain('Title is required.');
     expect(html).toContain('role="alert"');
     expect(html).toContain('fs-form-error');
@@ -48,7 +52,10 @@ describe('renderSubmissionFormHTML', () => {
   });
 
   it('adds aria-invalid to title input when error is set', () => {
-    const html = renderSubmissionFormHTML({ ...base, error: 'Title is required.' });
+    const html = renderSubmissionFormHTML({
+      ...base,
+      error: 'Title is required.',
+    });
     expect(html).toContain('aria-invalid="true"');
   });
 
@@ -63,7 +70,10 @@ describe('renderSubmissionFormHTML', () => {
   });
 
   it('escapes HTML in title value', () => {
-    const html = renderSubmissionFormHTML({ ...base, title: '<script>alert(1)</script>' });
+    const html = renderSubmissionFormHTML({
+      ...base,
+      title: '<script>alert(1)</script>',
+    });
     expect(html).toContain('&lt;script&gt;');
     expect(html).not.toContain('<script>');
   });

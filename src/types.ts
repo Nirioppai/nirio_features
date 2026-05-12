@@ -18,6 +18,8 @@ export interface Suggestion {
   createdAt: Date;
   voteCount: number;
   commentCount: number;
+  /** True when the current user has already voted for this suggestion. */
+  userVoted?: boolean;
 }
 
 export interface Comment {

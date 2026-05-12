@@ -47,7 +47,7 @@ export function filterByType(
   return suggestions.filter(s => s.type === type);
 }
 
-export function renderSuggestionCard(s: Suggestion): string {
+export function renderSuggestionCard(s: Suggestion, voted = false): string {
   const typeCls = typeToClassName(s.type);
   const statusBadgeMobile = s.status
     ? `<span class="fs-card-status fs-card-status--${statusToClassName(s.status)} fs-card-status--mobile">${escapeHtml(s.status)}</span>`
@@ -57,7 +57,7 @@ export function renderSuggestionCard(s: Suggestion): string {
     : '';
   return `
     <div class="fs-card" data-id="${escapeHtml(s.id)}" role="button" tabindex="0">
-      <button class="fs-vote-box" data-vote-id="${escapeHtml(s.id)}" aria-pressed="false" type="button">
+      <button class="fs-vote-box${voted ? ' fs-vote-box--active' : ''}" data-vote-id="${escapeHtml(s.id)}" aria-pressed="${voted}" type="button">
         <span class="fs-vote-arrow">▲</span>
         <span class="fs-vote-count">${s.voteCount}</span>
       </button>
@@ -69,9 +69,9 @@ export function renderSuggestionCard(s: Suggestion): string {
         <h3 class="fs-card-title">${escapeHtml(s.title)}</h3>
         ${s.details ? `<p class="fs-card-details">${escapeHtml(s.details)}</p>` : ''}
         <div class="fs-card-meta">
-          <button class="fs-vote-pill" data-vote-id="${escapeHtml(s.id)}" aria-pressed="false" type="button">▲ ${s.voteCount}</button>
+          <button class="fs-vote-pill${voted ? ' fs-vote-pill--active' : ''}" data-vote-id="${escapeHtml(s.id)}" aria-pressed="${voted}" type="button">▲ ${s.voteCount}</button>
           <span class="fs-card-sep">·</span>
-          <span class="fs-card-comments">💬 ${s.commentCount} comments</span>
+          <span class="fs-card-comments">${s.commentCount} comment${s.commentCount !== 1 ? 's' : ''}</span>
           <span class="fs-card-sep">·</span>
           <span class="fs-card-author">Suggested by ${escapeHtml(s.authorName)}</span>
           <span class="fs-card-sep">·</span>
@@ -91,6 +91,7 @@ export function renderFeedHTML(
   filterStyle: 'dropdown' | 'pill-row' = 'pill-row',
   filterStatus: SuggestionStatus | null = null,
   filterType: SuggestionType | null = null,
+  votedIds: ReadonlySet<string> = new Set(),
 ): string {
   if (loading) {
     return '<div class="fs-state fs-loading">Loading suggestions...</div>';
@@ -179,7 +180,7 @@ export function renderFeedHTML(
       ${
         visible.length === 0
           ? '<div class="fs-state fs-empty">No suggestions found.</div>'
-          : `<div class="fs-cards">${visible.map(renderSuggestionCard).join('')}</div>`
+          : `<div class="fs-cards">${visible.map(s => renderSuggestionCard(s, votedIds.has(s.id))).join('')}</div>`
       }
     </div>`;
 }
@@ -193,7 +194,7 @@ function escapeHtml(str: string): string {
     .replace(/'/g, '&#39;');
 }
 
-function relativeTime(date: Date): string {
+export function relativeTime(date: Date): string {
   const diff = Date.now() - date.getTime();
   const mins = Math.floor(diff / 60000);
   if (mins < 1) return 'just now';
