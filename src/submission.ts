@@ -51,7 +51,7 @@ export function renderSubmissionFormHTML(state: SubmissionFormState): string {
           class="fs-form-input fs-form-textarea"
           id="fs-details"
           name="details"
-          placeholder="Optional — describe the problem, who it affects, and what success looks like."
+          placeholder="Optional - describe the problem, who it affects, and what success looks like."
           rows="4"
         >${escapeHtml(state.details)}</textarea>
       </div>
